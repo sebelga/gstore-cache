@@ -1,5 +1,7 @@
 {
-    "tabWidth": 4,
+    "eslintIntegration": true,
+    "printWidth": 120,
     "singleQuote": true,
-    "trailingComma": "all"
+    "tabWidth": 4,
+    "trailingComma": "es5"
 }

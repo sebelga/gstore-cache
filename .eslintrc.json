@@ -9,16 +9,22 @@
         "ecmaVersion": 6,
         "sourceType": "script"
     },
-    "plugins": [
-        "mocha"
-    ],
+    "plugins": ["mocha", "prettier"],
     "rules": {
+        "arrow-parens": "off",
         "comma-dangle": [
             "error",
             {
                 "arrays": "always-multiline",
                 "objects": "always-multiline",
                 "functions": "ignore"
+            }
+        ],
+        "function-paren-newline": "off",
+        "import/no-extraneous-dependencies": [
+            "error",
+            {
+                "off": ["**/test/**/*.js"]
             }
         ],
         "indent": [
@@ -28,10 +34,8 @@
                 "SwitchCase": 1
             }
         ],
-        "max-len": [
-            "error",
-            120
-        ],
+        "max-len": ["error", 120],
+        "no-underscore-dangle": "off",
         "no-use-before-define": [
             "error",
             {
