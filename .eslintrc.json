@@ -1,0 +1,42 @@
+{
+    "extends": "airbnb-base",
+    "root": true,
+    "env": {
+        "node": true,
+        "jasmine": true
+    },
+    "parserOptions": {
+        "ecmaVersion": 6,
+        "sourceType": "script"
+    },
+    "plugins": [
+        "mocha"
+    ],
+    "rules": {
+        "comma-dangle": [
+            "error",
+            {
+                "arrays": "always-multiline",
+                "objects": "always-multiline",
+                "functions": "ignore"
+            }
+        ],
+        "indent": [
+            "error",
+            4,
+            {
+                "SwitchCase": 1
+            }
+        ],
+        "max-len": [
+            "error",
+            120
+        ],
+        "no-use-before-define": [
+            "error",
+            {
+                "functions": false
+            }
+        ]
+    }
+}
