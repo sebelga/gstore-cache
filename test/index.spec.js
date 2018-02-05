@@ -14,6 +14,7 @@ const { datastore } = require('../lib/utils');
 const { keys, entities } = require('./mocks/entities');
 
 const { expect, assert } = chai;
+const { dsKeyToString } = datastore;
 
 // We override the createClient from redis with a mock
 Redis.createClient = (...args) => {
@@ -39,11 +40,13 @@ describe('gstore-cache', () => {
     });
 
     describe('init()', () => {
-        it('should override the default ttl values', () => {
+        it('should override the default config', () => {
             gstoreCache.init(true);
 
-            expect(gstoreCache.ttl().keys).equal(600);
-            expect(gstoreCache.ttl().queries).equal(60);
+            expect(gstoreCache.getConfig().ttl.keys).equal(600);
+            expect(gstoreCache.getConfig().ttl.queries).equal(60);
+            expect(gstoreCache.getConfig().global).equal(true);
+
             gstoreCache.init({
                 stores: [
                     {
@@ -56,9 +59,12 @@ describe('gstore-cache', () => {
                     keys: 30,
                     queries: 30,
                 },
+                global: false,
             });
-            expect(gstoreCache.ttl().keys).equal(30);
-            expect(gstoreCache.ttl().queries).equal(30);
+
+            expect(gstoreCache.getConfig().ttl.keys).equal(30);
+            expect(gstoreCache.getConfig().ttl.queries).equal(30);
+            expect(gstoreCache.getConfig().global).equal(false);
         });
 
         it('should detect redis client', () => {
@@ -69,7 +75,7 @@ describe('gstore-cache', () => {
                     queries: 30,
                 },
             });
-            redisClient = gstoreCache.redisClient();
+            redisClient = gstoreCache.getRedisClient();
             assert.isDefined(redisClient);
         });
 
@@ -84,8 +90,23 @@ describe('gstore-cache', () => {
                     queries: 30,
                 },
             });
-            redisClient = gstoreCache.redisClient();
+            redisClient = gstoreCache.getRedisClient();
             assert.isDefined(redisClient);
+        });
+    });
+
+    describe('getCacheManager()', () => {
+        it('should return the cache manager', () => {
+            const cacheManager = gstoreCache.init(true);
+            expect(cacheManager).equal(gstoreCache.getCacheManager());
+        });
+    });
+
+    describe('deleteCacheManager()', () => {
+        it('should work', done => {
+            gstoreCache.deleteCacheManager(() => {
+                done();
+            });
         });
     });
 
@@ -106,9 +127,9 @@ describe('gstore-cache', () => {
             methods.fetchHandler.restore();
         });
 
-        it('should get entity from cache', () => {
+        it('should get entity from cache (1)', () => {
             sinon.spy(methods, 'fetchHandler');
-            cacheManager.set(datastore.dsKeytoString(key1), entity1);
+            cacheManager.set(dsKeyToString(key1), entity1);
 
             return gstoreCache.getKeys(key1, methods.fetchHandler).then(result => {
                 expect(methods.fetchHandler.called).equal(false);
@@ -116,18 +137,64 @@ describe('gstore-cache', () => {
             });
         });
 
+        it('should get entity from cache (2)', () => {
+            sinon.spy(methods, 'fetchHandler');
+            gstoreCache.getConfig().global = false;
+            cacheManager.mset(dsKeyToString(key1), entity1, dsKeyToString(key2), entity2);
+
+            return gstoreCache.getKeys([key1, key2], { cache: true }, methods.fetchHandler).then(results => {
+                expect(methods.fetchHandler.called).equal(false);
+                expect(results[0].name).equal('John');
+                expect(results[1].name).equal('Mick');
+            });
+        });
+
+        it('should *not* get entity from cache (1)', () => {
+            sinon.stub(methods, 'fetchHandler').resolves([]);
+            gstoreCache.getConfig().global = false;
+            cacheManager.set(dsKeyToString(key1), entity1);
+
+            return gstoreCache.getKeys(key1, methods.fetchHandler).then(() => {
+                expect(methods.fetchHandler.called).equal(true);
+            });
+        });
+
+        it('should *not* get entity from cache (2)', () => {
+            sinon.stub(methods, 'fetchHandler').resolves([]);
+            cacheManager.set(dsKeyToString(key1), entity1);
+
+            return gstoreCache.getKeys(key1, { cache: false }, methods.fetchHandler).then(() => {
+                expect(methods.fetchHandler.called).equal(true);
+            });
+        });
+
         it('should get entity from fetchHandler', () => {
             sinon.stub(methods, 'fetchHandler').resolves(entity3);
 
-            return gstoreCache.getKeys(key1, methods.fetchHandler).then(result => {
+            return gstoreCache.getKeys(key3, methods.fetchHandler).then(result => {
                 expect(methods.fetchHandler.called).equal(true);
                 expect(result.name).equal('Carol');
+
+                return cacheManager.get(dsKeyToString(key3)).then(cacheResponse => {
+                    expect(cacheResponse.name).equal('Carol');
+                });
+            });
+        });
+
+        it('should prime the cache after fetch', () => {
+            sinon.stub(methods, 'fetchHandler').resolves([entity1, entity2]);
+
+            return gstoreCache.getKeys([key1, key2], methods.fetchHandler).then(() => {
+                return cacheManager.mget(dsKeyToString(key1), dsKeyToString(key2)).then(results => {
+                    expect(results[0].name).equal('John');
+                    expect(results[1].name).equal('Mick');
+                });
             });
         });
 
         it('should get entities from cache + fetch', () => {
-            cacheManager.set(datastore.dsKeytoString(key1), entity1);
-            cacheManager.set(datastore.dsKeytoString(key2), entity2);
+            cacheManager.set(dsKeyToString(key1), entity1);
+            cacheManager.set(dsKeyToString(key2), entity2);
 
             sinon.stub(methods, 'fetchHandler').resolves(entity3);
 
@@ -139,11 +206,11 @@ describe('gstore-cache', () => {
             });
         });
 
-        it('should return "null" for fetch not found (404)', () => {
+        it('should return "null" for fetch not found ("ERR_ENTITY_NOT_FOUND")', () => {
             const error = new Error('not found');
-            error.code = 404;
+            error.code = 'ERR_ENTITY_NOT_FOUND';
 
-            cacheManager.set(datastore.dsKeytoString(key1), entity1);
+            cacheManager.set(dsKeyToString(key1), entity1);
             sinon.stub(methods, 'fetchHandler').returns(Promise.reject(error));
 
             return gstoreCache.getKeys([key1, key2], methods.fetchHandler).then(result => {
@@ -163,9 +230,9 @@ describe('gstore-cache', () => {
             });
         });
 
-        it('should buble up the error from the fetch (2)', done => {
+        it('should bubble up the error from the fetch (2)', done => {
             const error = new Error('Houston we got an error');
-            cacheManager.set(datastore.dsKeytoString(key1), entity1);
+            cacheManager.set(dsKeyToString(key1), entity1);
             sinon.stub(methods, 'fetchHandler').rejects(error);
 
             gstoreCache.getKeys([key1, key2], methods.fetchHandler).catch(err => {
