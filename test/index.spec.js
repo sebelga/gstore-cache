@@ -14,7 +14,6 @@ const { datastore } = require('../lib/utils');
 const { keys, entities } = require('./mocks/entities');
 
 const { expect, assert } = chai;
-const { dsKeyToString } = datastore;
 
 // We override the createClient from redis with a mock
 Redis.createClient = (...args) => {
@@ -43,9 +42,11 @@ describe('gstore-cache', () => {
         it('should override the default config', () => {
             gstoreCache.init(true);
 
-            expect(gstoreCache.getConfig().ttl.keys).equal(600);
-            expect(gstoreCache.getConfig().ttl.queries).equal(60);
-            expect(gstoreCache.getConfig().global).equal(true);
+            let config = gstoreCache.getConfig();
+            expect(config.ttl.keys).equal(600);
+            expect(config.ttl.queries).equal(60);
+            expect(config.global).equal(true);
+            expect(config.cachePrefix).deep.equal({ keys: 'gck:', queries: 'gcq:' });
 
             gstoreCache.init({
                 stores: [
@@ -60,11 +61,14 @@ describe('gstore-cache', () => {
                     queries: 30,
                 },
                 global: false,
+                cachePrefix: { keys: 'customk:', queries: 'customq:' },
             });
 
-            expect(gstoreCache.getConfig().ttl.keys).equal(30);
-            expect(gstoreCache.getConfig().ttl.queries).equal(30);
-            expect(gstoreCache.getConfig().global).equal(false);
+            config = gstoreCache.getConfig();
+            expect(config.ttl.keys).equal(30);
+            expect(config.ttl.queries).equal(30);
+            expect(config.global).equal(false);
+            expect(config.cachePrefix).deep.equal({ keys: 'customk:', queries: 'customq:' });
         });
 
         it('should detect redis client', () => {
@@ -112,6 +116,9 @@ describe('gstore-cache', () => {
 
     describe('getKeys()', () => {
         let cacheManager;
+        let config;
+        let keyToString;
+
         const [key1, key2, key3] = keys;
         const [entity1, entity2, entity3] = entities;
 
@@ -121,6 +128,10 @@ describe('gstore-cache', () => {
 
         beforeEach(() => {
             cacheManager = gstoreCache.init(true);
+            config = gstoreCache.getConfig();
+
+            // Add prefix to all cache keys
+            keyToString = key => config.cachePrefix.keys + datastore.dsKeyToString(key);
         });
 
         afterEach(() => {
@@ -129,7 +140,7 @@ describe('gstore-cache', () => {
 
         it('should get entity from cache (1)', () => {
             sinon.spy(methods, 'fetchHandler');
-            cacheManager.set(dsKeyToString(key1), entity1);
+            cacheManager.set(keyToString(key1), entity1);
 
             return gstoreCache.getKeys(key1, methods.fetchHandler).then(result => {
                 expect(methods.fetchHandler.called).equal(false);
@@ -140,7 +151,7 @@ describe('gstore-cache', () => {
         it('should get entity from cache (2)', () => {
             sinon.spy(methods, 'fetchHandler');
             gstoreCache.getConfig().global = false;
-            cacheManager.mset(dsKeyToString(key1), entity1, dsKeyToString(key2), entity2);
+            cacheManager.mset(keyToString(key1), entity1, keyToString(key2), entity2);
 
             return gstoreCache.getKeys([key1, key2], { cache: true }, methods.fetchHandler).then(results => {
                 expect(methods.fetchHandler.called).equal(false);
@@ -152,7 +163,7 @@ describe('gstore-cache', () => {
         it('should *not* get entity from cache (1)', () => {
             sinon.stub(methods, 'fetchHandler').resolves([]);
             gstoreCache.getConfig().global = false;
-            cacheManager.set(dsKeyToString(key1), entity1);
+            cacheManager.set(keyToString(key1), entity1);
 
             return gstoreCache.getKeys(key1, methods.fetchHandler).then(() => {
                 expect(methods.fetchHandler.called).equal(true);
@@ -161,7 +172,7 @@ describe('gstore-cache', () => {
 
         it('should *not* get entity from cache (2)', () => {
             sinon.stub(methods, 'fetchHandler').resolves([]);
-            cacheManager.set(dsKeyToString(key1), entity1);
+            cacheManager.set(keyToString(key1), entity1);
 
             return gstoreCache.getKeys(key1, { cache: false }, methods.fetchHandler).then(() => {
                 expect(methods.fetchHandler.called).equal(true);
@@ -175,7 +186,7 @@ describe('gstore-cache', () => {
                 expect(methods.fetchHandler.called).equal(true);
                 expect(result.name).equal('Carol');
 
-                return cacheManager.get(dsKeyToString(key3)).then(cacheResponse => {
+                return cacheManager.get(keyToString(key3)).then(cacheResponse => {
                     expect(cacheResponse.name).equal('Carol');
                 });
             });
@@ -185,7 +196,7 @@ describe('gstore-cache', () => {
             sinon.stub(methods, 'fetchHandler').resolves([entity1, entity2]);
 
             return gstoreCache.getKeys([key1, key2], methods.fetchHandler).then(() => {
-                return cacheManager.mget(dsKeyToString(key1), dsKeyToString(key2)).then(results => {
+                return cacheManager.mget(keyToString(key1), keyToString(key2)).then(results => {
                     expect(results[0].name).equal('John');
                     expect(results[1].name).equal('Mick');
                 });
@@ -193,8 +204,8 @@ describe('gstore-cache', () => {
         });
 
         it('should get entities from cache + fetch', () => {
-            cacheManager.set(dsKeyToString(key1), entity1);
-            cacheManager.set(dsKeyToString(key2), entity2);
+            cacheManager.set(keyToString(key1), entity1);
+            cacheManager.set(keyToString(key2), entity2);
 
             sinon.stub(methods, 'fetchHandler').resolves(entity3);
 
@@ -210,7 +221,7 @@ describe('gstore-cache', () => {
             const error = new Error('not found');
             error.code = 'ERR_ENTITY_NOT_FOUND';
 
-            cacheManager.set(dsKeyToString(key1), entity1);
+            cacheManager.set(keyToString(key1), entity1);
             sinon.stub(methods, 'fetchHandler').returns(Promise.reject(error));
 
             return gstoreCache.getKeys([key1, key2], methods.fetchHandler).then(result => {
@@ -232,7 +243,7 @@ describe('gstore-cache', () => {
 
         it('should bubble up the error from the fetch (2)', done => {
             const error = new Error('Houston we got an error');
-            cacheManager.set(dsKeyToString(key1), entity1);
+            cacheManager.set(keyToString(key1), entity1);
             sinon.stub(methods, 'fetchHandler').rejects(error);
 
             gstoreCache.getKeys([key1, key2], methods.fetchHandler).catch(err => {
