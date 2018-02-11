@@ -1,5 +1,6 @@
 'use strict';
 
+const ds = require('@google-cloud/datastore')();
 const chai = require('chai');
 const sinon = require('sinon');
 
@@ -41,11 +42,13 @@ describe('gstoreCache.keys', () => {
     describe('wrap()', () => {
         it('should get entity from cache (1)', () => {
             sinon.spy(methods, 'fetchHandler');
-            cacheManager.set(keyToString(key1), entity1);
+            const value = { name: string.random() };
+            cacheManager.set(keyToString(key1), value);
 
             return gsCache.keys.wrap(key1, methods.fetchHandler).then(result => {
                 expect(methods.fetchHandler.called).equal(false);
-                expect(result.name).equal('John');
+                expect(result.name).equal(value.name);
+                expect(result[ds.KEY]).equal(key1);
             });
         });
 
@@ -58,6 +61,8 @@ describe('gstoreCache.keys', () => {
                 expect(methods.fetchHandler.called).equal(false);
                 expect(results[0].name).equal('John');
                 expect(results[1].name).equal('Mick');
+                expect(results[0][ds.KEY]).equal(key1);
+                expect(results[1][ds.KEY]).equal(key2);
             });
         });
 
@@ -110,11 +115,15 @@ describe('gstoreCache.keys', () => {
 
             sinon.stub(methods, 'fetchHandler').resolves(entity3);
 
-            return gsCache.keys.wrap([key1, key2, key3], methods.fetchHandler).then(result => {
+            return gsCache.keys.wrap([key1, key2, key3], methods.fetchHandler).then(results => {
                 expect(methods.fetchHandler.called).equal(true);
-                expect(result[0].name).equal('John');
-                expect(result[1].name).equal('Mick');
-                expect(result[2].name).equal('Carol');
+                expect(results[0].name).equal('John');
+                expect(results[1].name).equal('Mick');
+                expect(results[2].name).equal('Carol');
+
+                expect(results[0][ds.KEY]).equal(key1);
+                expect(results[1][ds.KEY]).equal(key2);
+                expect(results[2][ds.KEY]).equal(key3);
             });
         });
 
@@ -164,15 +173,28 @@ describe('gstoreCache.keys', () => {
             });
         });
 
+        it('should add KEY Symbol to response from cache', () => {
+            const value = { name: 'john' };
+            return gsCache.keys.set(key1, value).then(() =>
+                gsCache.keys.get(key1).then(res => {
+                    assert.ok(!Array.isArray(res));
+                    expect(res).include(value);
+                    expect(res[ds.KEY]).equal(key1);
+                })
+            );
+        });
+
         it('should get multiple keys from cache', () => {
             const value1 = { name: string.random() };
             const value2 = { name: string.random() };
-            return gsCache.keys.set(key1, value1, key2, value2).then(() => {
+            return gsCache.keys.set(key1, value1, key2, value2).then(() =>
                 gsCache.keys.mget(key1, key2).then(res => {
-                    expect(res[0]).equal(value1);
-                    expect(res[1]).equal(value2);
-                });
-            });
+                    expect(res[0]).deep.equal(value1);
+                    expect(res[1]).deep.equal(value2);
+                    expect(res[0][ds.KEY]).equal(key1);
+                    expect(res[1][ds.KEY]).equal(key2);
+                })
+            );
         });
     });
 

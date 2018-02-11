@@ -20,6 +20,11 @@ describe('utils', () => {
             expect(str1).equal('nsUser111');
             expect(str2).equal('GranDadJohnDadMickUser555');
         });
+
+        it('should throw an error if no Key passed', () => {
+            const fn = () => dsKeyToString();
+            expect(fn).throws('Key cannot be undefined.');
+        });
     });
 
     describe('dsQueryToString', () => {
