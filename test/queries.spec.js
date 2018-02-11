@@ -18,7 +18,7 @@ describe('gstoreCache.queries', () => {
     let redisClient;
     let prefix;
 
-    const [query1] = queries;
+    const [query1, query2, query3] = queries;
 
     const methods = {
         fetchHandler() {
@@ -55,7 +55,7 @@ describe('gstoreCache.queries', () => {
             sinon.stub(methods, 'fetchHandler').resolves(queryRes);
             sinon.spy(gsCache, 'primeCache');
 
-            return gsCache.queries.get(query1, methods.fetchHandler).then(result => {
+            return gsCache.queries.wrap(query1, methods.fetchHandler).then(result => {
                 expect(methods.fetchHandler.called).equal(true);
                 expect(result).equal(queryRes);
                 expect(gsCache.primeCache.getCall(0).args[0]).equal(strQuery);
@@ -71,7 +71,7 @@ describe('gstoreCache.queries', () => {
         it('should get query from cache (1)', () => {
             cacheManager.set(queryToString(query1), queryRes);
 
-            return gsCache.queries.get(query1, methods.fetchHandler).then(result => {
+            return gsCache.queries.wrap(query1, methods.fetchHandler).then(result => {
                 expect(methods.fetchHandler.called).equal(false);
                 expect(result[0].name).equal(queryRes[0].name);
             });
@@ -81,7 +81,7 @@ describe('gstoreCache.queries', () => {
             gsCache.config.global = false;
             cacheManager.set(queryToString(query1), queryRes);
 
-            return gsCache.queries.get(query1, { cache: true }, methods.fetchHandler).then(result => {
+            return gsCache.queries.wrap(query1, { cache: true }, methods.fetchHandler).then(result => {
                 expect(methods.fetchHandler.called).equal(false);
                 expect(result[0].name).equal(queryRes[0].name);
             });
@@ -91,7 +91,7 @@ describe('gstoreCache.queries', () => {
             cacheManager.set(queryToString(query1), queryRes);
             gsCache.config.global = false;
 
-            return gsCache.queries.get(query1, methods.fetchHandler).then(() => {
+            return gsCache.queries.wrap(query1, methods.fetchHandler).then(() => {
                 expect(methods.fetchHandler.called).equal(true);
             });
         });
@@ -99,7 +99,7 @@ describe('gstoreCache.queries', () => {
         it('should *not* get query from cache (2)', () => {
             cacheManager.set(queryToString(query1), queryRes);
 
-            return gsCache.queries.get(query1, { cache: false }, methods.fetchHandler).then(() => {
+            return gsCache.queries.wrap(query1, { cache: false }, methods.fetchHandler).then(() => {
                 expect(methods.fetchHandler.called).equal(true);
             });
         });
@@ -110,7 +110,7 @@ describe('gstoreCache.queries', () => {
             // When ttl is set to "-1" don't cache
             gsCache.config.ttl = Object.assign({}, gsCache.config.ttl, { queries: -1 });
 
-            return gsCache.queries.get(query1, methods.fetchHandler).then(() => {
+            return gsCache.queries.wrap(query1, methods.fetchHandler).then(() => {
                 expect(methods.fetchHandler.called).equal(true);
             });
         });
@@ -119,7 +119,7 @@ describe('gstoreCache.queries', () => {
             methods.fetchHandler.restore();
             sinon.stub(methods, 'fetchHandler').resolves(queryRes);
 
-            return gsCache.queries.get(query1, methods.fetchHandler).then(() =>
+            return gsCache.queries.wrap(query1, methods.fetchHandler).then(() =>
                 cacheManager.get(queryToString(query1)).then(result => {
                     expect(result[0].name).equal(queryRes[0].name);
                 })
@@ -149,7 +149,7 @@ describe('gstoreCache.queries', () => {
                 sinon.spy(memoryCache.store, 'set');
                 sinon.spy(redisCache.store, 'set');
 
-                return gsCache.queries.get(query1, methods.fetchHandler).then(() => {
+                return gsCache.queries.wrap(query1, methods.fetchHandler).then(() => {
                     const options = gsCache.cacheManager.mset.getCall(0).args[2];
                     const optMemory = memoryCache.store.set.getCall(0).args[2];
                     const optRedis = redisCache.store.set.getCall(0).args[2];
@@ -196,7 +196,7 @@ describe('gstoreCache.queries', () => {
                     methods.fetchHandler.restore();
                     sinon.stub(methods, 'fetchHandler').resolves(queryRes);
 
-                    gsCache.queries.get(query1, methods.fetchHandler).then(result => {
+                    gsCache.queries.wrap(query1, methods.fetchHandler).then(result => {
                         expect(gsCache.primeCache.called).equal(false);
                         expect(gsCache.queries.cacheQueryEntityKind.called).equal(true);
 
@@ -227,7 +227,7 @@ describe('gstoreCache.queries', () => {
                     methods.fetchHandler.restore();
                     sinon.stub(methods, 'fetchHandler').resolves(queryRes);
 
-                    gsCache.queries.get(query1, methods.fetchHandler).then(() => {
+                    gsCache.queries.wrap(query1, methods.fetchHandler).then(() => {
                         expect(gsCache.primeCache.called).equal(true);
                         expect(gsCache.queries.cacheQueryEntityKind.called).equal(false);
                         done();
@@ -236,6 +236,127 @@ describe('gstoreCache.queries', () => {
                     gsCache.removeAllListeners();
                 };
                 gsCache.on('ready', onReady);
+            });
+        });
+    });
+
+    describe('get()', () => {
+        beforeEach(done => {
+            gsCache = GstoreCache(true);
+            queryRes = [{ name: string.random() }];
+
+            const onReady = () => {
+                prefix = gsCache.config.cachePrefix.queries;
+                queryToString = query => prefix + datastore.dsQueryToString(query);
+                gsCache.removeListener('ready', onReady);
+                done();
+            };
+            gsCache.on('ready', onReady);
+        });
+
+        it('should get query from cache', () =>
+            gsCache.queries.set(query1, queryRes).then(() => {
+                gsCache.queries.get(query1).then(res => {
+                    expect(res).equal(queryRes);
+                });
+            }));
+
+        it('should get multiple queries from cache', () => {
+            const queryRes2 = [{ name: string.random() }];
+            return gsCache.queries.set(query1, queryRes, query2, queryRes2).then(() => {
+                gsCache.queries.mget(query1, query2).then(res => {
+                    expect(res[0]).equal(queryRes);
+                    expect(res[1]).equal(queryRes2);
+                });
+            });
+        });
+    });
+
+    describe('set()', () => {
+        beforeEach(done => {
+            gsCache = GstoreCache(true);
+            queryRes = [{ name: string.random() }];
+
+            const onReady = () => {
+                prefix = gsCache.config.cachePrefix.queries;
+                queryToString = query => prefix + datastore.dsQueryToString(query);
+                gsCache.removeListener('ready', onReady);
+                done();
+            };
+            gsCache.on('ready', onReady);
+        });
+
+        it('should add Datastore Query to cache', () => {
+            sinon.spy(gsCache, 'set');
+            return gsCache.queries.set(query1, queryRes).then(result => {
+                assert.ok(gsCache.set.called);
+                const { args } = gsCache.set.getCall(0);
+                expect(args[0]).equal(queryToString(query1));
+                expect(result).deep.equal(queryRes);
+            });
+        });
+    });
+
+    describe('mset()', () => {
+        beforeEach(done => {
+            gsCache = GstoreCache(true);
+            queryRes = [{ name: string.random() }];
+
+            const onReady = () => {
+                prefix = gsCache.config.cachePrefix.queries;
+                queryToString = query => prefix + datastore.dsQueryToString(query);
+                gsCache.removeListener('ready', onReady);
+                done();
+            };
+            gsCache.on('ready', onReady);
+        });
+
+        it('should add Datastore Query to cache', () => {
+            const queryRes2 = [{ name: string.random() }];
+            sinon.spy(gsCache, 'mset');
+            return gsCache.queries.mset(query1, queryRes, query2, queryRes2).then(result => {
+                assert.ok(gsCache.mset.called);
+                const { args } = gsCache.mset.getCall(0);
+                expect(args[0]).equal(queryToString(query1));
+                expect(args[1]).equal(queryRes);
+                expect(args[2]).equal(queryToString(query2));
+                expect(args[3]).equal(queryRes2);
+                expect(result).include.members([queryRes, queryRes2]);
+            });
+        });
+    });
+
+    describe('del()', () => {
+        beforeEach(done => {
+            gsCache = GstoreCache(true);
+            queryRes = [{ name: string.random() }];
+
+            const onReady = () => {
+                prefix = gsCache.config.cachePrefix.queries;
+                queryToString = query => prefix + datastore.dsQueryToString(query);
+                gsCache.removeListener('ready', onReady);
+                done();
+            };
+            gsCache.on('ready', onReady);
+        });
+
+        it('should delete 1 query from cache', () => {
+            sinon.spy(gsCache, 'del');
+            return gsCache.queries.del(query1).then(() => {
+                assert.ok(gsCache.del.called);
+                const { args } = gsCache.del.getCall(0);
+                expect(args[0]).deep.equal([queryToString(query1)]);
+            });
+        });
+
+        it('should delete multiple queries from cache', () => {
+            sinon.spy(gsCache, 'del');
+            return gsCache.queries.del(query1, query2, query3).then(() => {
+                assert.ok(gsCache.del.called);
+                const { args } = gsCache.del.getCall(0);
+                expect(args[0][0]).deep.equal(queryToString(query1));
+                expect(args[0][1]).deep.equal(queryToString(query2));
+                expect(args[0][2]).deep.equal(queryToString(query3));
             });
         });
     });
