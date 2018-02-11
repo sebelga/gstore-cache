@@ -9,9 +9,6 @@ const GstoreCache = require('../lib');
 
 const ds = new Datastore({ projectId: 'gstore-cache-e2e-tests' });
 
-// const { datastore, string } = require('../lib/utils');
-// const { keys, entities } = require('./mocks/datastore');
-
 const { expect } = chai;
 
 const key1 = ds.key(['User', 123]);
@@ -20,14 +17,14 @@ const key3 = ds.key(['User', 789]);
 const allKeys = [key1, key2, key3];
 
 const data1 = { name: 'John Snow' };
-const data2 = { name: 'Mick Jagger' };
-const data3 = { name: 'Keith Richards' };
+// const data2 = { name: 'Mick Jagger' };
+// const data3 = { name: 'Keith Richards' };
 
 const cleanUp = cb => {
     ds.delete(allKeys).then(() => cb());
 };
 
-describe.only('e2e (Datastore & Redis)', () => {
+describe('e2e (Datastore & Redis)', () => {
     let cache;
 
     beforeEach(function integrationTest(done) {
@@ -67,10 +64,10 @@ describe.only('e2e (Datastore & Redis)', () => {
                 expect(typeof result1).equal('undefined'); // make sure the cache is empty
                 ds
                     .get(key1)
-                    .then(result2 => cache.keys.set(key1, result2))
+                    .then(result2 => cache.keys.set(key1, result2[0]))
                     .then(() => cache.keys.get(key1))
                     .then(result3 => {
-                        expect(result3[0]).deep.equal(data1);
+                        expect(result3).deep.equal(data1);
                     });
             })
         ));
@@ -79,14 +76,15 @@ describe.only('e2e (Datastore & Redis)', () => {
         it('should add data to cache', () =>
             ds.save({ key: key1, data: data1 }).then(() => {
                 const fetchHandler = keys => ds.get(keys);
+
                 return cache.keys
                     .wrap(key1, fetchHandler)
                     .then(result => {
-                        expect(result[0]).deep.equal(data1);
+                        expect(result).deep.equal(data1);
                     })
                     .then(() =>
                         cache.keys.wrap(key1, fetchHandler).then(result => {
-                            expect(result[0]).deep.equal(data1);
+                            expect(result).deep.equal(data1);
                             expect(ds.get.callCount).equal(1);
                         })
                     );

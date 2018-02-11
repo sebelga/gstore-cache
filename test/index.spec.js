@@ -27,7 +27,7 @@ describe('gsCache', () => {
 
     describe('init()', () => {
         it('should override the default config', done => {
-            gsCache = GstoreCache(true);
+            gsCache = GstoreCache();
 
             const { config } = gsCache;
             expect(config.ttl.keys).equal(600);

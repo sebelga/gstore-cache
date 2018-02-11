@@ -40,19 +40,19 @@ cache.keys
     .get(key)
     .then(cacheEntity => {
         if (cacheEntity) {
-            // Cache found, no need to go any further
-            return [cacheEntity]; // wrap in an Array to align with google-cloud response
+            // Cache found... great!
+            return cacheEntity;
         }
 
         // Fetch from the Datastore
         return datastore.get(key).then(response => {
             // prime the cache. The Datastore Key object will be converted
             // to a unique *string* key
-            return cache.keys.set(key, response[0]).then(() => response);
+            return cache.keys.set(key, response[0]).then(() => response[0]);
         });
     })
-    .then(response => {
-        console.log(response[0]);
+    .then(entity => {
+        console.log(entity);
     });
 ```
 
@@ -71,8 +71,8 @@ const key = datastore.key(['Company', 'Google']);
  * The second argument "fetchHandler" is the handler used to get the entities if the key is not found in the cache
  */
 const fetchHandler = keys => ds.get(keys);
-cache.keys.wrap(key, fetchHandler).then(response => {
-    console.log(response[0]);
+cache.keys.wrap(key, fetchHandler).then(entity => {
+    console.log(entity);
 });
 
 /**
@@ -86,8 +86,7 @@ const key2 = datastore.key(['Task', 456]); // in cache
 const key3 = datastore.key(['Task', 789]);
 
 const fetchHandler = keys => ds.get(keys);
-cache.keys.wrap([key1, key2, key3], fetchHandler).then(response => {
-    const entities = response[0];
+cache.keys.wrap([key1, key2, key3], fetchHandler).then(entities => {
     console.log(entities[0]);
     console.log(entities[1]);
     console.log(entities[2]);

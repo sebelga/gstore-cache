@@ -173,6 +173,12 @@ describe('gstoreCache.keys', () => {
             );
         });
 
+        it('should return undefined if no entity found', () => {
+            return gsCache.keys.get(key1).then(res => {
+                expect(typeof res).equal('undefined');
+            });
+        });
+
         it('should add KEY Symbol to response from cache', () => {
             const value = { name: 'john' };
             return gsCache.keys.set(key1, value).then(() =>
