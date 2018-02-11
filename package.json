@@ -8,6 +8,7 @@
         "pretest": "npm run lint",
         "prettier": "prettier --write \"{lib,test}/**/*.js\"",
         "test": "mocha test --recursive",
+        "e2e-test": "DATASTORE_EMULATOR_HOST=localhost:8081 mocha test/e2e.spec.js --recursive --e2e",
         "coverage": "istanbul cover ./node_modules/mocha/bin/_mocha -- -R spec --recursive",
         "coveralls":
             "istanbul cover _mocha --report lcovonly -- -R spec --recursive && cat ./coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js && rm -rf ./coverage"
@@ -53,6 +54,7 @@
         "pre-commit": "1.2.2",
         "prettier": "1.10.2",
         "redis-mock": "^0.20.0",
-        "sinon": "^4.2.0"
+        "sinon": "^4.2.0",
+        "yargs": "11.0.0"
     }
 }

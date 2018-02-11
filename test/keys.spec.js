@@ -166,11 +166,11 @@ describe('gstoreCache.keys', () => {
     describe('get()', () => {
         it('should get key from cache', () => {
             const value = { name: 'john' };
-            return gsCache.keys.set(key1, value).then(() => {
+            return gsCache.keys.set(key1, value).then(() =>
                 gsCache.keys.get(key1).then(res => {
-                    expect(res).equal(value);
-                });
-            });
+                    expect(res).deep.equal(value);
+                })
+            );
         });
 
         it('should add KEY Symbol to response from cache', () => {

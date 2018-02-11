@@ -10,9 +10,12 @@ https://raw.githubusercontent.com/dbader/readme-template/master/README.md
 [![Build Status][travis-image]][travis-url]
 [![coveralls-image]][coveralls-url]
 
-Advanced cache layer for Google Datastore Datastore Entities Keys and Queries. Define multiple cache stores thanks to [node-cache-manager](https://github.com/BryanDonovan/node-cache-manager) that gstore-cache uses underneath. You get out of the box a LRU memory cache to speed up your application right away!
+gstore cache helps you speed up your Datastore entities fetching by providing an advanced cache layer:
 
-Advanced cache (with [node Redis](https://github.com/NodeRedis/node_redis)) will automatically save your Queries by **Entity Kind**. You can then set an infinite ttl (time to live) for your queries and only invalidate the cache when you _edit_ or _delete_ an entity Kind.
+* Define multiple cache stores with different TTL (time to live) thanks to [node-cache-manager](https://github.com/BryanDonovan/node-cache-manager).
+* LRU memory cache out of the box to speed up your application right away!
+* Datastore Key and Query objects are converted to unique string ids, easy to cache
+* Advanced cache (with [node Redis](https://github.com/NodeRedis/node_redis)) will automatically save your Queries by **Entity Kind**. You can then set an infinite TTL for your queries and only invalidate the cache when you _edit_ or _delete_ an entity Kind.
 
 ## Installation
 
@@ -53,7 +56,7 @@ cache.keys
     });
 ```
 
-The above code could be simplified with the "wrap" helper.
+The above code can be simplified a lot with the "wrap" helper.
 
 ```js
 const Datastore = require('@google-cloud/datastore');
@@ -65,22 +68,25 @@ const cache = GstoreCache();
 const key = datastore.key(['Company', 'Google']);
 
 /**
- * "datastore.get" is the Handler to fetch the key(s) if they are not found
+ * The second argument "fetchHandler" is the handler used to get the entities if the key is not found in the cache
  */
-cache.wrap(key, datastore.get).then(response => {
+const fetchHandler = keys => ds.get(keys);
+cache.keys.wrap(key, fetchHandler).then(response => {
     console.log(response[0]);
 });
 
 /**
  * If we pass several keys, gstore-cache will first search for them in the cache.
- * If not all the keys are found, *only* the ones missing will be passed to the fetch Handler
- * In the following example, only the "key3" would be passed to datastore.get() method
+ * The fetch handler will *only* be passed the keys not found in the cache.
+ *
+ * In the example below, only the "key3" would be passed to datastore.get() method
  */
 const key1 = datastore.key(['Task', 123]); // in cache
 const key2 = datastore.key(['Task', 456]); // in cache
 const key3 = datastore.key(['Task', 789]);
 
-cache.keys.wrap([key1, key2, key3], datastore.get).then(response => {
+const fetchHandler = keys => ds.get(keys);
+cache.keys.wrap([key1, key2, key3], fetchHandler).then(response => {
     const entities = response[0];
     console.log(entities[0]);
     console.log(entities[1]);
@@ -104,6 +110,22 @@ npm run coverage
 npm run prettier
 ```
 
+To run the e2e test you need to launch the Local Datastore emulator and a local Redis server.
+
+```sh
+# Local Datastore
+# Make sure you have the emulator installed
+# More info: https://cloud.google.com/datastore/docs/tools/datastore-emulator
+#
+# The following command will create a "local-datastore" folder inside the project
+# where the Local Datastore will keep the entities
+gcloud beta emulators datastore start --data-dir=$PWD/local-datastore
+
+# Redis server (Mac Os or Linux)
+# From inside the folder where redis is located:
+./redis-server
+```
+
 ## Release History
 
 * 0.1.0
@@ -111,7 +133,7 @@ npm run prettier
 
 ## Meta
 
-Sébastien Loix – [@sebelga](https://twitter.com/sebelga) – sebastien@loix.me
+Sébastien Loix – [@sebloix](https://twitter.com/sebloix) – sebastien@loix.me
 
 Distributed under the MIT license. See `LICENSE` for more information.
 
