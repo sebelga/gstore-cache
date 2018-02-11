@@ -33,7 +33,8 @@ describe('gstoreCache.queries', () => {
             sinon.spy(methods, 'fetchHandler');
 
             const onReady = () => {
-                queryToString = query => gsCache.config.cachePrefix.queries + datastore.dsQueryToString(query);
+                prefix = gsCache.config.cachePrefix.queries;
+                queryToString = query => prefix + datastore.dsQueryToString(query);
                 ({ cacheManager } = gsCache);
                 gsCache.removeListener('ready', onReady);
                 ready();
@@ -179,11 +180,8 @@ describe('gstoreCache.queries', () => {
                 gsCache.queries.cacheQueryEntityKind.restore();
             });
 
-            it('should not prime the cache and save query of Entity Kind', done => {
+            it('should not prime the cache and save the query in its entity Kind Set', done => {
                 cache = StoreMock('redis');
-                // We need Promise version of the mock store
-                cache.store.get = () => Promise.resolve();
-                cache.store.mset = () => Promise.resolve();
 
                 gsCache = GstoreCache({
                     stores: [cache],
@@ -203,9 +201,9 @@ describe('gstoreCache.queries', () => {
                         expect(gsCache.queries.cacheQueryEntityKind.called).equal(true);
 
                         const { args } = gsCache.queries.cacheQueryEntityKind.getCall(0);
-                        expect(args[0]).equal('Company');
-                        expect(args[1]).equal(queryKey);
-                        expect(args[2]).equal(queryRes);
+                        expect(args[0]).equal(queryKey);
+                        expect(args[1]).equal(queryRes);
+                        expect(args[2]).equal('Company');
                         expect(result).equal(queryRes);
                         done();
                     });
@@ -217,8 +215,6 @@ describe('gstoreCache.queries', () => {
 
             it('should still prime the cache and *not** save query for Entity Kind', done => {
                 cache = StoreMock('redis');
-                cache.store.get = () => Promise.resolve();
-                cache.store.mset = () => Promise.resolve();
 
                 gsCache = GstoreCache({
                     stores: [cache],
@@ -253,10 +249,10 @@ describe('gstoreCache.queries', () => {
             sinon.spy(methods, 'fetchHandler');
 
             const onReady = () => {
-                queryToString = query => gsCache.config.cachePrefix.queries + datastore.dsQueryToString(query);
+                prefix = gsCache.config.cachePrefix.queries;
+                queryToString = query => prefix + datastore.dsQueryToString(query);
                 ({ cacheManager, redisClient } = gsCache);
                 gsCache.removeListener('ready', onReady);
-                prefix = gsCache.config.cachePrefix.queries;
                 ready();
             };
             gsCache.on('ready', onReady);
@@ -271,11 +267,29 @@ describe('gstoreCache.queries', () => {
             const queryKey = queryToString(query1);
             sinon.spy(redisClient, 'multi');
 
-            return gsCache.queries.cacheQueryEntityKind('User', queryKey, queryRes).then(() => {
+            return gsCache.queries.cacheQueryEntityKind(queryKey, queryRes, 'User').then(() => {
                 assert.ok(redisClient.multi.called);
                 const { args } = redisClient.multi.getCall(0);
                 expect(args[0][0]).deep.equal(['sadd', `${prefix}User`, queryKey]);
                 expect(args[0][1]).deep.equal(['set', queryKey, JSON.stringify(queryRes)]);
+
+                redisClient.multi.restore();
+            });
+        });
+
+        it('should allow an unlimited number of entity Kinds for a query', () => {
+            const queryKey = queryToString(query1);
+            sinon.spy(redisClient, 'multi');
+
+            return gsCache.queries.cacheQueryEntityKind(queryKey, queryRes, 'User', 'Task', 'Post').then(() => {
+                assert.ok(redisClient.multi.called);
+                const { args } = redisClient.multi.getCall(0);
+                expect(args[0][0]).deep.equal(['sadd', `${prefix}User`, queryKey]);
+                expect(args[0][1]).deep.equal(['sadd', `${prefix}Task`, queryKey]);
+                expect(args[0][2]).deep.equal(['sadd', `${prefix}Post`, queryKey]);
+                expect(args[0][3]).deep.equal(['set', queryKey, JSON.stringify(queryRes)]);
+
+                redisClient.multi.restore();
             });
         });
 
@@ -299,6 +313,78 @@ describe('gstoreCache.queries', () => {
 
             return gsCache.queries.cacheQueryEntityKind().catch(err => {
                 expect(err).equal(error);
+            });
+        });
+    });
+
+    describe('cleanQueriesEntityKind', () => {
+        beforeEach(ready => {
+            gsCache = GstoreCache({
+                stores: [StoreMock('redis')],
+            });
+            queryRes = [{ name: string.random() }];
+            sinon.spy(methods, 'fetchHandler');
+
+            const onReady = () => {
+                prefix = gsCache.config.cachePrefix.queries;
+                queryToString = query => prefix + datastore.dsQueryToString(query);
+                ({ cacheManager, redisClient } = gsCache);
+                gsCache.removeListener('ready', onReady);
+                ready();
+            };
+            gsCache.on('ready', onReady);
+        });
+
+        afterEach(() => {
+            methods.fetchHandler.restore();
+            gsCache.removeAllListeners();
+        });
+
+        it('should remove all queries keys from entityKind Set and their cache', () => {
+            sinon.stub(redisClient, 'smembers').callsFake((key, cb) => {
+                cb(null, ['abc', 'def']);
+            });
+            sinon.stub(redisClient, 'del').callsFake((keys, cb) => cb(null, 7));
+
+            return gsCache.queries.cleanQueriesEntityKind('User').then(res => {
+                assert.ok(redisClient.smembers.called);
+                assert.ok(redisClient.del.called);
+                const { args: argsSmembers } = redisClient.smembers.getCall(0);
+                const { args: argsDel } = redisClient.del.getCall(0);
+
+                const setQueries = `${prefix}User`;
+                expect(argsSmembers[0]).equal(setQueries);
+                expect(argsDel[0]).include.members(['abc', 'def', setQueries]);
+                expect(res).equal(7);
+
+                redisClient.smembers.restore();
+                redisClient.del.restore();
+            });
+        });
+
+        it('should bubble up errors from "smembers" call', done => {
+            const error = new Error('Houston we really got a problem');
+            sinon.stub(redisClient, 'smembers').callsFake((key, cb) => {
+                cb(error);
+            });
+
+            gsCache.queries.cleanQueriesEntityKind('User').catch(err => {
+                expect(err).equal(error);
+
+                redisClient.smembers.restore();
+                done();
+            });
+        });
+
+        it('should bubble up errors from "del" call', done => {
+            const error = new Error('Houston we really got a problem');
+            sinon.stub(redisClient, 'del').callsFake((key, cb) => {
+                cb(error);
+            });
+
+            gsCache.queries.cleanQueriesEntityKind('User').catch(err => {
+                expect(err).equal(error);
+                done();
             });
         });
     });

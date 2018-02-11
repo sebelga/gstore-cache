@@ -11,10 +11,40 @@ module.exports = (name = 'memory') => ({
         name,
         options: {},
         getClient: () => client,
-        reset: (...args) => getCallback(...args)(),
-        set: (...args) => getCallback(...args)(),
-        mset: (...args) => getCallback(...args)(),
-        get: (...args) => getCallback(...args)(),
-        mget: (...args) => getCallback(...args)(),
+        reset: (...args) => {
+            const cb = getCallback(...args);
+            if (typeof cb === 'function') {
+                return cb();
+            }
+            return Promise.resolve();
+        },
+        set: (...args) => {
+            const cb = getCallback(...args);
+            if (typeof cb === 'function') {
+                return cb();
+            }
+            return Promise.resolve();
+        },
+        mset: (...args) => {
+            const cb = getCallback(...args);
+            if (typeof cb === 'function') {
+                return cb();
+            }
+            return Promise.resolve();
+        },
+        get: (...args) => {
+            const cb = getCallback(...args);
+            if (typeof cb === 'function') {
+                return cb();
+            }
+            return Promise.resolve();
+        },
+        mget: (...args) => {
+            const cb = getCallback(...args);
+            if (typeof cb === 'function') {
+                return cb();
+            }
+            return Promise.resolve();
+        },
     },
 });
