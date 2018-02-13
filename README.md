@@ -10,7 +10,7 @@ https://raw.githubusercontent.com/dbader/readme-template/master/README.md
 [![Build Status][travis-image]][travis-url]
 [![coveralls-image]][coveralls-url]
 
-gstore cache helps you speed up your Datastore entities fetching by providing an advanced cache layer:
+gstore cache helps you speed up your Datastore entities fetching by providing an advanced cache layer on top of @google-cloud/datastore:
 
 * Define multiple cache stores with different TTL (time to live) thanks to [node-cache-manager](https://github.com/BryanDonovan/node-cache-manager).
 * LRU memory cache out of the box to speed up your application right away!
@@ -32,7 +32,48 @@ const Datastore = require('@google-cloud/datastore');
 const GstoreCache = require('gstore-cache');
 
 const datastore = new Datastore();
-const cache = GstoreCache(); // default config (see below)
+const cache = GstoreCache({ datastore });
+
+const key = datastore.key(['Company', 'Google']);
+
+/**
+ * The following is all you need to
+ * - Fetch the entity from the cache
+ * - If it is not found, get it from the Datastore
+ * - Prime the cache with the entity data.
+ */
+cache.keys.wrap(key).then(entity => {
+    console.log(entity);
+    console.log(entity[datastore.KEY]); // the Key Symbol is added from cache result
+});
+
+/**
+ * You can also pass several keys.
+ * gstore-cache will first check the cache and only fetch from the Datastore
+ * the ones *not* found.
+ *
+ * In the example below, only the "key3" would be passed to datastore.get() and
+ * fetched from the Datastore
+ */
+const key1 = datastore.key(['Task', 123]); // this entity is in cache
+const key2 = datastore.key(['Task', 456]); // this entity is in cache
+const key3 = datastore.key(['Task', 789]);
+
+cache.keys.wrap([key1, key2, key3]).then(entities => {
+    console.log(entities[0]);
+    console.log(entities[1]);
+    console.log(entities[2]);
+});
+```
+
+The "wrap" helper above is just syntactic sugar for the following
+
+```js
+const Datastore = require('@google-cloud/datastore');
+const GstoreCache = require('gstore-cache');
+
+const datastore = new Datastore();
+const cache = GstoreCache({ datastore });
 
 const key = datastore.key(['Company', 'Google']);
 
@@ -46,51 +87,15 @@ cache.keys
 
         // Fetch from the Datastore
         return datastore.get(key).then(response => {
-            // prime the cache. The Datastore Key object will be converted
-            // to a unique *string* key
+            // Prime the cache.
+            // The Datastore Key object will be converted to a unique
+            // string key in the cache.
             return cache.keys.set(key, response[0]).then(() => response[0]);
         });
     })
     .then(entity => {
         console.log(entity);
     });
-```
-
-The above code can be simplified a lot with the "wrap" helper.
-
-```js
-const Datastore = require('@google-cloud/datastore');
-const GstoreCache = require('gstore-cache');
-
-const ds = new Datastore();
-const cache = GstoreCache();
-
-const key = datastore.key(['Company', 'Google']);
-
-/**
- * The second argument "fetchHandler" is the handler used to get the entities if the key is not found in the cache
- */
-const fetchHandler = keys => ds.get(keys);
-cache.keys.wrap(key, fetchHandler).then(entity => {
-    console.log(entity);
-});
-
-/**
- * If we pass several keys, gstore-cache will first search for them in the cache.
- * The fetch handler will *only* be passed the keys not found in the cache.
- *
- * In the example below, only the "key3" would be passed to datastore.get() method
- */
-const key1 = datastore.key(['Task', 123]); // in cache
-const key2 = datastore.key(['Task', 456]); // in cache
-const key3 = datastore.key(['Task', 789]);
-
-const fetchHandler = keys => ds.get(keys);
-cache.keys.wrap([key1, key2, key3], fetchHandler).then(entities => {
-    console.log(entities[0]);
-    console.log(entities[1]);
-    console.log(entities[2]);
-});
 ```
 
 ## Development setup

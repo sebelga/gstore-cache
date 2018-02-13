@@ -4,6 +4,7 @@
 
 const chai = require('chai');
 const sinon = require('sinon');
+const ds = require('@google-cloud/datastore')();
 
 const GstoreCache = require('../lib');
 const StoreMock = require('./mocks/cache-store');
@@ -39,19 +40,21 @@ describe('gsCache', () => {
             // to make sure the "ready" listener is only on this new cache.
             process.nextTick(() => {
                 gsCache = GstoreCache({
-                    stores: [
-                        {
-                            store: 'memory',
-                            max: 200,
-                            ttl: 3000,
+                    config: {
+                        stores: [
+                            {
+                                store: 'memory',
+                                max: 200,
+                                ttl: 3000,
+                            },
+                        ],
+                        ttl: {
+                            keys: 30,
+                            queries: 30,
                         },
-                    ],
-                    ttl: {
-                        keys: 30,
-                        queries: 30,
+                        global: false,
+                        cachePrefix: { keys: 'customk:', queries: 'customq:' },
                     },
-                    global: false,
-                    cachePrefix: { keys: 'customk:', queries: 'customq:' },
                 });
 
                 const onGstoreReady = () => {
@@ -74,10 +77,12 @@ describe('gsCache', () => {
             const redisCache = StoreMock('redis');
 
             gsCache = GstoreCache({
-                stores: [redisCache],
-                ttl: {
-                    keys: 30,
-                    queries: 30,
+                config: {
+                    stores: [redisCache],
+                    ttl: {
+                        keys: 30,
+                        queries: 30,
+                    },
                 },
             });
 
@@ -89,10 +94,12 @@ describe('gsCache', () => {
             const redisCache = StoreMock('redis');
 
             gsCache = GstoreCache({
-                stores: [memoryCache, redisCache],
-                ttl: {
-                    keys: 30,
-                    queries: 30,
+                config: {
+                    stores: [memoryCache, redisCache],
+                    ttl: {
+                        keys: 30,
+                        queries: 30,
+                    },
                 },
             });
 
@@ -106,17 +113,33 @@ describe('gsCache', () => {
         });
 
         it('should return same instances', () => {
-            gsCache = GstoreCache(true);
+            gsCache = GstoreCache();
             const gstoreCache2 = GstoreCache();
 
             expect(gstoreCache2).equal(gsCache);
         });
+
+        it('should save google datastore instance', () => {
+            gsCache = GstoreCache({ datastore: ds });
+
+            expect(gsCache.ds).equal(ds);
+        });
     });
 
     describe('primeCache()', () => {
+        let cacheManager;
+        beforeEach(done => {
+            gsCache = GstoreCache({ datastore: ds });
+
+            const onReady = () => {
+                ({ cacheManager } = gsCache);
+                gsCache.removeAllListeners();
+                done();
+            };
+            gsCache.on('ready', onReady);
+        });
+
         it('should concatenate key|value pairs and return single value', () => {
-            gsCache = GstoreCache(true);
-            const { cacheManager } = gsCache;
             sinon.stub(cacheManager, 'mset').resolves(['Mick Jagger']);
 
             return gsCache.primeCache('user123', 'Mick Jagger').then(response => {
@@ -126,8 +149,6 @@ describe('gsCache', () => {
         });
 
         it('should concatenate key|value pairs and return multiple value', () => {
-            gsCache = GstoreCache(true);
-            const { cacheManager } = gsCache;
             sinon.stub(cacheManager, 'mset').resolves(['Mick Jagger', 'John Snow']);
 
             return gsCache.primeCache(['user123'], ['john snow']).then(response => {
@@ -137,8 +158,6 @@ describe('gsCache', () => {
         });
 
         it('should maintain value as Array', () => {
-            gsCache = GstoreCache(true);
-            const { cacheManager } = gsCache;
             sinon.stub(cacheManager, 'mset').resolves(['Mick Jagger']);
 
             return gsCache.primeCache('user123', ['Mick Jagger']).then(() => {
@@ -151,16 +170,18 @@ describe('gsCache', () => {
     });
 
     describe('getCacheManager()', () => {
-        it('should return the cache manager', () => {
-            gsCache = GstoreCache(true);
-
-            assert.isDefined(gsCache.cacheManager);
+        it('should return the cache manager', done => {
+            gsCache = GstoreCache();
+            gsCache.on('ready', () => {
+                assert.isDefined(gsCache.cacheManager);
+                done();
+            });
         });
     });
 
     describe('deleteCacheManager()', () => {
         it('should work', done => {
-            gsCache = GstoreCache(true);
+            gsCache = GstoreCache();
 
             gsCache.deleteCacheManager(() => {
                 gsCache.deleteCacheManager(done);
@@ -170,7 +191,7 @@ describe('gsCache', () => {
 
     describe('get|mget|set|mset|del', () => {
         it('should bind to cache-manager methods', () => {
-            gsCache = GstoreCache(true);
+            gsCache = GstoreCache();
             const { cacheManager } = gsCache;
 
             expect(gsCache.get).equal(cacheManager.get);

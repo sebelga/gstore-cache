@@ -2,8 +2,8 @@
 
 const chai = require('chai');
 const sinon = require('sinon');
+const requireUncached = require('require-uncached');
 
-const GstoreCache = require('../lib');
 const { datastore, string } = require('../lib/utils');
 const { queries } = require('./mocks/datastore');
 const StoreMock = require('./mocks/cache-store');
@@ -26,9 +26,14 @@ describe('gstoreCache.queries', () => {
         },
     };
 
-    describe('get()', () => {
+    describe('wrap()', () => {
+        const GstoreCache = requireUncached('../lib');
+        let defaultConfig;
+
         beforeEach(ready => {
-            gsCache = GstoreCache(true);
+            gsCache = GstoreCache();
+            defaultConfig = Object.assign({}, gsCache.config);
+
             queryRes = [{ name: string.random() }];
             sinon.spy(methods, 'fetchHandler');
 
@@ -42,11 +47,20 @@ describe('gstoreCache.queries', () => {
             gsCache.on('ready', onReady);
         });
 
-        afterEach(() => {
+        afterEach(done => {
+            gsCache.removeAllListeners();
+            // make sure we have the default config in
+            // case it has been modified
+            gsCache._config = defaultConfig;
+
             if (methods.fetchHandler.restore) {
                 methods.fetchHandler.restore();
             }
-            gsCache.removeAllListeners();
+
+            if (gsCache.cacheManager) {
+                gsCache.cacheManager.reset();
+            }
+            done();
         });
 
         it('should get query from fetchHandler', () => {
@@ -108,10 +122,12 @@ describe('gstoreCache.queries', () => {
             cacheManager.set(queryToString(query1), queryRes);
 
             // When ttl is set to "-1" don't cache
+            const copyConfig = gsCache.config.ttl;
             gsCache.config.ttl = Object.assign({}, gsCache.config.ttl, { queries: -1 });
 
             return gsCache.queries.wrap(query1, methods.fetchHandler).then(() => {
                 expect(methods.fetchHandler.called).equal(true);
+                gsCache.config.ttl = copyConfig;
             });
         });
 
@@ -120,7 +136,7 @@ describe('gstoreCache.queries', () => {
             sinon.stub(methods, 'fetchHandler').resolves(queryRes);
 
             return gsCache.queries.wrap(query1, methods.fetchHandler).then(() =>
-                cacheManager.get(queryToString(query1)).then(result => {
+                gsCache.cacheManager.get(queryToString(query1)).then(result => {
                     expect(result[0].name).equal(queryRes[0].name);
                 })
             );
@@ -131,20 +147,24 @@ describe('gstoreCache.queries', () => {
             const redisCache = StoreMock('redis');
 
             gsCache = GstoreCache({
-                stores: [memoryCache, redisCache],
-                ttl: {
-                    stores: {
-                        memory: {
-                            queries: 1357,
-                        },
-                        redis: {
-                            queries: 2468,
+                config: {
+                    stores: [memoryCache, redisCache],
+                    ttl: {
+                        stores: {
+                            memory: {
+                                queries: 1357,
+                            },
+                            redis: {
+                                queries: 2468,
+                            },
                         },
                     },
                 },
             });
 
             const onReady = () => {
+                gsCache.removeAllListeners();
+
                 sinon.spy(gsCache.cacheManager, 'mset');
                 sinon.spy(memoryCache.store, 'set');
                 sinon.spy(redisCache.store, 'set');
@@ -159,7 +179,8 @@ describe('gstoreCache.queries', () => {
                     expect(optRedis.ttl).equal(2468);
 
                     gsCache.deleteCacheManager(() => {
-                        gsCache.removeAllListeners();
+                        memoryCache.store.set.restore();
+                        redisCache.store.set.restore();
                         done();
                     });
                 });
@@ -184,9 +205,11 @@ describe('gstoreCache.queries', () => {
                 cache = StoreMock('redis');
 
                 gsCache = GstoreCache({
-                    stores: [cache],
-                    ttl: {
-                        stores: { redis: { queries: 0 } }, // when set to "0" triggers infinite cache
+                    config: {
+                        stores: [cache],
+                        ttl: {
+                            stores: { redis: { queries: 0 } }, // when set to "0" triggers infinite cache
+                        },
                     },
                 });
 
@@ -217,9 +240,11 @@ describe('gstoreCache.queries', () => {
                 cache = StoreMock('redis');
 
                 gsCache = GstoreCache({
-                    stores: [cache],
-                    ttl: {
-                        stores: { redis: { queries: 10 } }, // when set to "0" triggers infinite cache
+                    config: {
+                        stores: [cache],
+                        ttl: {
+                            stores: { redis: { queries: 10 } }, // when set to "0" triggers infinite cache
+                        },
                     },
                 });
 
@@ -241,8 +266,10 @@ describe('gstoreCache.queries', () => {
     });
 
     describe('get()', () => {
+        const GstoreCache = requireUncached('../lib');
+
         beforeEach(done => {
-            gsCache = GstoreCache(true);
+            gsCache = GstoreCache();
             queryRes = [{ name: string.random() }];
 
             const onReady = () => {
@@ -255,26 +282,28 @@ describe('gstoreCache.queries', () => {
         });
 
         it('should get query from cache', () =>
-            gsCache.queries.set(query1, queryRes).then(() => {
+            gsCache.queries.set(query1, queryRes).then(() =>
                 gsCache.queries.get(query1).then(res => {
                     expect(res).equal(queryRes);
-                });
-            }));
+                })
+            ));
 
         it('should get multiple queries from cache', () => {
             const queryRes2 = [{ name: string.random() }];
-            return gsCache.queries.set(query1, queryRes, query2, queryRes2).then(() => {
+            return gsCache.queries.mset(query1, queryRes, query2, queryRes2).then(() =>
                 gsCache.queries.mget(query1, query2).then(res => {
                     expect(res[0]).equal(queryRes);
                     expect(res[1]).equal(queryRes2);
-                });
-            });
+                })
+            );
         });
     });
 
     describe('set()', () => {
+        const GstoreCache = requireUncached('../lib');
+
         beforeEach(done => {
-            gsCache = GstoreCache(true);
+            gsCache = GstoreCache();
             queryRes = [{ name: string.random() }];
 
             const onReady = () => {
@@ -298,8 +327,10 @@ describe('gstoreCache.queries', () => {
     });
 
     describe('mset()', () => {
+        const GstoreCache = requireUncached('../lib');
+
         beforeEach(done => {
-            gsCache = GstoreCache(true);
+            gsCache = GstoreCache();
             queryRes = [{ name: string.random() }];
 
             const onReady = () => {
@@ -327,11 +358,14 @@ describe('gstoreCache.queries', () => {
     });
 
     describe('del()', () => {
+        const GstoreCache = requireUncached('../lib');
+
         beforeEach(done => {
-            gsCache = GstoreCache(true);
+            gsCache = GstoreCache();
             queryRes = [{ name: string.random() }];
 
             const onReady = () => {
+                sinon.spy(gsCache, 'del');
                 prefix = gsCache.config.cachePrefix.queries;
                 queryToString = query => prefix + datastore.dsQueryToString(query);
                 gsCache.removeListener('ready', onReady);
@@ -340,31 +374,35 @@ describe('gstoreCache.queries', () => {
             gsCache.on('ready', onReady);
         });
 
-        it('should delete 1 query from cache', () => {
-            sinon.spy(gsCache, 'del');
-            return gsCache.queries.del(query1).then(() => {
+        afterEach(() => {
+            gsCache.del.restore();
+        });
+
+        it('should delete 1 query from cache', () =>
+            gsCache.queries.del(query1).then(() => {
                 assert.ok(gsCache.del.called);
                 const { args } = gsCache.del.getCall(0);
                 expect(args[0]).deep.equal([queryToString(query1)]);
-            });
-        });
+            }));
 
-        it('should delete multiple queries from cache', () => {
-            sinon.spy(gsCache, 'del');
-            return gsCache.queries.del(query1, query2, query3).then(() => {
+        it('should delete multiple queries from cache', () =>
+            gsCache.queries.del(query1, query2, query3).then(() => {
                 assert.ok(gsCache.del.called);
                 const { args } = gsCache.del.getCall(0);
                 expect(args[0][0]).deep.equal(queryToString(query1));
                 expect(args[0][1]).deep.equal(queryToString(query2));
                 expect(args[0][2]).deep.equal(queryToString(query3));
-            });
-        });
+            }));
     });
 
     describe('cacheQueryEntityKind', () => {
-        beforeEach(ready => {
+        const GstoreCache = requireUncached('../lib');
+
+        beforeEach(done => {
             gsCache = GstoreCache({
-                stores: [StoreMock('redis')],
+                config: {
+                    stores: [StoreMock('redis')],
+                },
             });
             queryRes = [{ name: string.random() }];
             sinon.spy(methods, 'fetchHandler');
@@ -374,7 +412,7 @@ describe('gstoreCache.queries', () => {
                 queryToString = query => prefix + datastore.dsQueryToString(query);
                 ({ cacheManager, redisClient } = gsCache);
                 gsCache.removeListener('ready', onReady);
-                ready();
+                done();
             };
             gsCache.on('ready', onReady);
         });
@@ -439,9 +477,13 @@ describe('gstoreCache.queries', () => {
     });
 
     describe('cleanQueriesEntityKind', () => {
+        const GstoreCache = requireUncached('../lib');
+
         beforeEach(ready => {
             gsCache = GstoreCache({
-                stores: [StoreMock('redis')],
+                config: {
+                    stores: [StoreMock('redis')],
+                },
             });
             queryRes = [{ name: string.random() }];
             sinon.spy(methods, 'fetchHandler');

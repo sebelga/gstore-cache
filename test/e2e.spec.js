@@ -5,7 +5,9 @@ const { argv } = require('yargs');
 const Datastore = require('@google-cloud/datastore');
 const chai = require('chai');
 const sinon = require('sinon');
-const GstoreCache = require('../lib');
+const requireUncached = require('require-uncached');
+
+const GstoreCache = requireUncached('../lib');
 
 const ds = new Datastore({ projectId: 'gstore-cache-e2e-tests' });
 
@@ -33,7 +35,7 @@ describe('e2e (Datastore & Redis)', () => {
         }
         sinon.spy(ds, 'get');
 
-        cache = GstoreCache(true);
+        cache = GstoreCache({ datastore: ds });
         const onReady = () => {
             done();
         };

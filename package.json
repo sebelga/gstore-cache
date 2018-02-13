@@ -4,6 +4,7 @@
     "description": "Cache manager for Google Datastore",
     "main": "index.js",
     "scripts": {
+        "local-datastore": "gcloud beta emulators datastore start --data-dir=$PWD/local-datastore",
         "lint": "eslint ./lib && eslint ./test",
         "pretest": "npm run lint",
         "prettier": "prettier --write \"{lib,test}/**/*.js\"",
@@ -54,6 +55,7 @@
         "pre-commit": "1.2.2",
         "prettier": "1.10.2",
         "redis-mock": "^0.20.0",
+        "require-uncached": "1.0.3",
         "sinon": "^4.2.0",
         "yargs": "11.0.0"
     }

@@ -23,7 +23,7 @@ describe('gstoreCache.keys', () => {
     };
 
     beforeEach(done => {
-        gsCache = GstoreCache(true);
+        gsCache = GstoreCache({ datastore: ds });
 
         gsCache.on('ready', () => {
             keyToString = key => gsCache.config.cachePrefix.keys + datastore.dsKeyToString(key);
@@ -90,6 +90,19 @@ describe('gstoreCache.keys', () => {
 
             return gsCache.keys.wrap(key3, methods.fetchHandler).then(result => {
                 expect(methods.fetchHandler.called).equal(true);
+                expect(result.name).equal('Carol');
+
+                return cacheManager.get(keyToString(key3)).then(cacheResponse => {
+                    expect(cacheResponse.name).equal('Carol');
+                });
+            });
+        });
+
+        it('should get entity from *default* fetchHandler', () => {
+            sinon.stub(ds, 'get').resolves(entity3);
+
+            return gsCache.keys.wrap(key3).then(result => {
+                expect(ds.get.called).equal(true);
                 expect(result.name).equal('Carol');
 
                 return cacheManager.get(keyToString(key3)).then(cacheResponse => {
