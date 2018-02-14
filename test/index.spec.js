@@ -32,7 +32,7 @@ describe('gsCache', () => {
 
             const { config } = gsCache;
             expect(config.ttl.keys).equal(600);
-            expect(config.ttl.queries).equal(60);
+            expect(config.ttl.queries).equal(5);
             expect(config.global).equal(true);
             expect(config.cachePrefix).deep.equal({ keys: 'gck:', queries: 'gcq:' });
 

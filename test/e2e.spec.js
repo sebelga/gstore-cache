@@ -76,20 +76,18 @@ describe('e2e (Datastore & Redis)', () => {
 
     describe('wrap', () => {
         it('should add data to cache', () =>
-            ds.save({ key: key1, data: data1 }).then(() => {
-                const fetchHandler = keys => ds.get(keys);
-
-                return cache.keys
-                    .wrap(key1, fetchHandler)
+            ds.save({ key: key1, data: data1 }).then(() =>
+                cache.keys
+                    .wrap(key1)
                     .then(result => {
                         expect(result).deep.equal(data1);
                     })
                     .then(() =>
-                        cache.keys.wrap(key1, fetchHandler).then(result => {
+                        cache.keys.wrap(key1).then(result => {
                             expect(result).deep.equal(data1);
                             expect(ds.get.callCount).equal(1);
                         })
-                    );
-            }));
+                    )
+            ));
     });
 });

@@ -37,20 +37,20 @@ const cache = GstoreCache({ datastore });
 const key = datastore.key(['Company', 'Google']);
 
 /**
- * The following is all you need to
- * - Fetch the entity from the cache
- * - If it is not found, get it from the Datastore
- * - Prime the cache with the entity data.
+ * The "keys.wrap()" helper will
+ * - Try to fetch the entity from the cache
+ * - If it is not found, fetch it from the Datastore
+ * - Prime the cache with the entity data retrieve from the Datastore.
  */
 cache.keys.wrap(key).then(entity => {
     console.log(entity);
-    console.log(entity[datastore.KEY]); // the Key Symbol is added from cache result
+    console.log(entity[datastore.KEY]); // the Key Symbol is added from cache results
 });
 
 /**
  * You can also pass several keys.
  * gstore-cache will first check the cache and only fetch from the Datastore
- * the ones *not* found.
+ * the keys *not* found.
  *
  * In the example below, only the "key3" would be passed to datastore.get() and
  * fetched from the Datastore
@@ -87,10 +87,12 @@ cache.keys
 
         // Fetch from the Datastore
         return datastore.get(key).then(response => {
+            const entity = response[0];
+
             // Prime the cache.
             // The Datastore Key object will be converted to a unique
             // string key in the cache.
-            return cache.keys.set(key, response[0]).then(() => response[0]);
+            return cache.keys.set(key, entity);
         });
     })
     .then(entity => {
@@ -141,7 +143,8 @@ Sébastien Loix – [@sebloix](https://twitter.com/sebloix) – sebastien@loix.m
 
 Distributed under the MIT license. See `LICENSE` for more information.
 
-[https://github.com/sebelga](https://github.com/sebelga/)
+[https://github.com/sebelga](https://github.com/sebelga/)  
+[http://s.loix.me](http://s.loix.me)
 
 ## Contributing
 

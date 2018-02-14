@@ -142,6 +142,32 @@ describe('gstoreCache.queries', () => {
             );
         });
 
+        it('should get query from *default* fetchHandler', () => {
+            sinon.stub(query1, 'run').resolves(queryRes);
+
+            return gsCache.queries.wrap(query1).then(result => {
+                expect(query1.run.called).equal(true);
+                expect(result[0].name).equal(queryRes[0].name);
+
+                return cacheManager.get(queryToString(query1)).then(cacheResponse => {
+                    expect(cacheResponse[0].name).equal(queryRes[0].name);
+                });
+            });
+        });
+
+        it('should set the TTL from config', () => {
+            methods.fetchHandler.restore();
+            sinon.spy(gsCache.cacheManager, 'mset');
+            sinon.stub(methods, 'fetchHandler').resolves(queryRes);
+
+            return gsCache.queries.wrap(query1, methods.fetchHandler).then(() => {
+                assert.ok(gsCache.cacheManager.mset.called);
+                const { args } = gsCache.cacheManager.mset.getCall(0);
+                expect(args[2].ttl).equal(5);
+                gsCache.cacheManager.mset.restore();
+            });
+        });
+
         it('should set ttl dynamically when multistore', done => {
             const memoryCache = StoreMock();
             const redisCache = StoreMock('redis');
@@ -188,6 +214,18 @@ describe('gstoreCache.queries', () => {
 
             gsCache.on('ready', onReady);
         });
+
+        // TODO
+        // it('should buble up the error from the fetch (1)', done => {
+        //     const error = new Error('Houston we got an error');
+
+        //     sinon.stub(methods, 'fetchHandler').rejects(error);
+
+        //     gsCache.keys.wrap(key1, methods.fetchHandler).catch(err => {
+        //         expect(err.message).equal('Houston we got an error');
+        //         done();
+        //     });
+        // });
 
         describe('when redis cache present', () => {
             let cache;
@@ -310,18 +348,29 @@ describe('gstoreCache.queries', () => {
                 prefix = gsCache.config.cachePrefix.queries;
                 queryToString = query => prefix + datastore.dsQueryToString(query);
                 gsCache.removeListener('ready', onReady);
+                sinon.spy(gsCache, 'set');
                 done();
             };
             gsCache.on('ready', onReady);
         });
 
+        afterEach(() => {
+            gsCache.set.restore();
+        });
+
         it('should add Datastore Query to cache', () => {
-            sinon.spy(gsCache, 'set');
             return gsCache.queries.set(query1, queryRes).then(result => {
                 assert.ok(gsCache.set.called);
                 const { args } = gsCache.set.getCall(0);
                 expect(args[0]).equal(queryToString(query1));
                 expect(result).deep.equal(queryRes);
+            });
+        });
+
+        it('should set the TTL from config', () => {
+            return gsCache.queries.set(query1, queryRes).then(() => {
+                const { args } = gsCache.set.getCall(0);
+                expect(args[2].ttl).equal(5);
             });
         });
     });
@@ -337,14 +386,18 @@ describe('gstoreCache.queries', () => {
                 prefix = gsCache.config.cachePrefix.queries;
                 queryToString = query => prefix + datastore.dsQueryToString(query);
                 gsCache.removeListener('ready', onReady);
+                sinon.spy(gsCache, 'mset');
                 done();
             };
             gsCache.on('ready', onReady);
         });
 
+        afterEach(() => {
+            gsCache.mset.restore();
+        });
+
         it('should add Datastore Query to cache', () => {
             const queryRes2 = [{ name: string.random() }];
-            sinon.spy(gsCache, 'mset');
             return gsCache.queries.mset(query1, queryRes, query2, queryRes2).then(result => {
                 assert.ok(gsCache.mset.called);
                 const { args } = gsCache.mset.getCall(0);
@@ -353,6 +406,14 @@ describe('gstoreCache.queries', () => {
                 expect(args[2]).equal(queryToString(query2));
                 expect(args[3]).equal(queryRes2);
                 expect(result).include.members([queryRes, queryRes2]);
+            });
+        });
+
+        it('should set the TTL from config', () => {
+            const queryRes2 = [{ name: string.random() }];
+            return gsCache.queries.set(query1, queryRes, query2, queryRes2).then(() => {
+                const { args } = gsCache.mset.getCall(0);
+                expect(args[4].ttl).equal(5);
             });
         });
     });
