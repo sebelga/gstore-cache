@@ -121,7 +121,7 @@ describe('gstoreCache.keys', () => {
         it('should get entity from *default* fetchHandler', () => {
             sinon.stub(ds, 'get').resolves(entity3);
 
-            return gsCache.keys.wrap(key3).then(result => {
+            return gsCache.keys.wrap(key3, { cache: true }).then(result => {
                 expect(ds.get.called).equal(true);
                 expect(result.name).equal('Carol');
 

@@ -75,6 +75,10 @@ const GstoreCache = require('gstore-cache');
 const datastore = new Datastore();
 const cache = GstoreCache({ datastore });
 
+// New API
+// const cache = gsCache.init({ datastore });
+// const cache = gsCache.instance();
+
 const key = datastore.key(['Company', 'Google']);
 
 cache.keys

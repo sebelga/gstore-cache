@@ -145,7 +145,7 @@ describe('gstoreCache.queries', () => {
         it('should get query from *default* fetchHandler', () => {
             sinon.stub(query1, 'run').resolves(queryRes);
 
-            return gsCache.queries.wrap(query1).then(result => {
+            return gsCache.queries.wrap(query1, { cache: true }).then(result => {
                 expect(query1.run.called).equal(true);
                 expect(result[0].name).equal(queryRes[0].name);
 
@@ -215,17 +215,16 @@ describe('gstoreCache.queries', () => {
             gsCache.on('ready', onReady);
         });
 
-        // TODO
-        // it('should buble up the error from the fetch (1)', done => {
-        //     const error = new Error('Houston we got an error');
+        it('should buble up the error from the fetch (1)', done => {
+            const error = new Error('Houston we got an error');
+            methods.fetchHandler.restore();
+            sinon.stub(methods, 'fetchHandler').rejects(error);
 
-        //     sinon.stub(methods, 'fetchHandler').rejects(error);
-
-        //     gsCache.keys.wrap(key1, methods.fetchHandler).catch(err => {
-        //         expect(err.message).equal('Houston we got an error');
-        //         done();
-        //     });
-        // });
+            gsCache.queries.wrap(query1, methods.fetchHandler).catch(err => {
+                expect(err.message).equal('Houston we got an error');
+                done();
+            });
+        });
 
         describe('when redis cache present', () => {
             let cache;
@@ -358,21 +357,19 @@ describe('gstoreCache.queries', () => {
             gsCache.set.restore();
         });
 
-        it('should add Datastore Query to cache', () => {
-            return gsCache.queries.set(query1, queryRes).then(result => {
+        it('should add Datastore Query to cache', () =>
+            gsCache.queries.set(query1, queryRes).then(result => {
                 assert.ok(gsCache.set.called);
                 const { args } = gsCache.set.getCall(0);
                 expect(args[0]).equal(queryToString(query1));
                 expect(result).deep.equal(queryRes);
-            });
-        });
+            }));
 
-        it('should set the TTL from config', () => {
-            return gsCache.queries.set(query1, queryRes).then(() => {
+        it('should set the TTL from config', () =>
+            gsCache.queries.set(query1, queryRes).then(() => {
                 const { args } = gsCache.set.getCall(0);
                 expect(args[2].ttl).equal(5);
-            });
-        });
+            }));
     });
 
     describe('mset()', () => {
