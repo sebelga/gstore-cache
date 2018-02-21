@@ -329,6 +329,52 @@ describe('gstoreCache.keys', () => {
                 expect(args[2].ttl).equal(600);
             });
         });
+
+        it('should set ttl dynamically when multistore', done => {
+            const memoryCache = StoreMock();
+            const redisCache = StoreMock('redis');
+
+            gsCache = gstoreCache.init({
+                config: {
+                    stores: [memoryCache, redisCache],
+                    ttl: {
+                        stores: {
+                            memory: {
+                                keys: 1357,
+                            },
+                            redis: {
+                                keys: 2468,
+                            },
+                        },
+                    },
+                },
+            });
+
+            const onReady = () => {
+                gsCache.removeAllListeners();
+
+                sinon.spy(gsCache, 'set');
+                sinon.spy(memoryCache.store, 'set');
+                sinon.spy(redisCache.store, 'set');
+                sinon.stub(methods, 'fetchHandler').resolves(entity1);
+
+                return gsCache.keys.set(key1, entity1).then(() => {
+                    const options = gsCache.set.getCall(0).args[2];
+                    const optMemory = memoryCache.store.set.getCall(0).args[2];
+                    const optRedis = redisCache.store.set.getCall(0).args[2];
+
+                    expect(typeof options.ttl).equal('function');
+                    expect(optMemory.ttl).equal(1357);
+                    expect(optRedis.ttl).equal(2468);
+
+                    memoryCache.store.set.restore();
+                    redisCache.store.set.restore();
+                    done();
+                });
+            };
+
+            gsCache.on('ready', onReady);
+        });
     });
 
     describe('mset()', () => {

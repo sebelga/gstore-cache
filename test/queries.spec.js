@@ -204,11 +204,9 @@ describe('gstoreCache.queries', () => {
                     expect(optMemory.ttl).equal(1357);
                     expect(optRedis.ttl).equal(2468);
 
-                    gsCache.deleteCacheManager(() => {
-                        memoryCache.store.set.restore();
-                        redisCache.store.set.restore();
-                        done();
-                    });
+                    memoryCache.store.set.restore();
+                    redisCache.store.set.restore();
+                    done();
                 });
             };
 
@@ -273,14 +271,14 @@ describe('gstoreCache.queries', () => {
                 gsCache.on('ready', onReady);
             });
 
-            it('should still prime the cache and *not** save query for Entity Kind', done => {
+            it('should still prime the cache and *not** save query in Entity Kind Set', done => {
                 cache = StoreMock('redis');
 
                 gsCache = gstoreCache.init({
                     config: {
                         stores: [cache],
                         ttl: {
-                            stores: { redis: { queries: 10 } }, // when set to "0" triggers infinite cache
+                            stores: { redis: { queries: 10 } },
                         },
                     },
                 });
@@ -370,6 +368,121 @@ describe('gstoreCache.queries', () => {
                 const { args } = gsCache.set.getCall(0);
                 expect(args[2].ttl).equal(5);
             }));
+
+        it('should set ttl dynamically when multistore', done => {
+            const memoryCache = StoreMock();
+            const redisCache = StoreMock('redis');
+
+            gsCache = gstoreCache.init({
+                config: {
+                    stores: [memoryCache, redisCache],
+                    ttl: {
+                        stores: {
+                            memory: {
+                                queries: 1357,
+                            },
+                            redis: {
+                                queries: 2468,
+                            },
+                        },
+                    },
+                },
+            });
+
+            const onReady = () => {
+                gsCache.removeAllListeners();
+
+                sinon.spy(gsCache, 'set');
+                sinon.spy(memoryCache.store, 'set');
+                sinon.spy(redisCache.store, 'set');
+
+                return gsCache.queries.set(query1, queryRes).then(() => {
+                    const options = gsCache.set.getCall(0).args[2];
+                    const optMemory = memoryCache.store.set.getCall(0).args[2];
+                    const optRedis = redisCache.store.set.getCall(0).args[2];
+
+                    expect(typeof options.ttl).equal('function');
+                    expect(optMemory.ttl).equal(1357);
+                    expect(optRedis.ttl).equal(2468);
+
+                    memoryCache.store.set.restore();
+                    redisCache.store.set.restore();
+                    done();
+                });
+            };
+
+            gsCache.on('ready', onReady);
+        });
+
+        describe('when redis cache present', () => {
+            let cache;
+
+            beforeEach(() => {
+                sinon.spy(gsCache.queries, 'cacheQueryEntityKind');
+            });
+            afterEach(() => {
+                gsCache.queries.cacheQueryEntityKind.restore();
+            });
+
+            it('should not prime the cache and save the query in its entity Kind Set', done => {
+                cache = StoreMock('redis');
+
+                gsCache = gstoreCache.init({
+                    config: {
+                        stores: [cache],
+                        ttl: {
+                            stores: { redis: { queries: 0 } },
+                        },
+                    },
+                });
+
+                const onReady = () => {
+                    sinon.spy(gsCache, 'set');
+                    const queryKey = queryToString(query1);
+
+                    gsCache.queries.set(query1, queryRes).then(result => {
+                        expect(gsCache.set.called).equal(false);
+                        expect(gsCache.queries.cacheQueryEntityKind.called).equal(true);
+
+                        const { args } = gsCache.queries.cacheQueryEntityKind.getCall(0);
+                        expect(args[0]).equal(queryKey);
+                        expect(args[1]).equal(queryRes);
+                        expect(args[2]).equal('Company');
+                        expect(result).equal(queryRes);
+                        done();
+                    });
+
+                    gsCache.removeAllListeners();
+                };
+                gsCache.on('ready', onReady);
+            });
+
+            it('should still prime the cache and *not** save query in Entity Kind Set', done => {
+                cache = StoreMock('redis');
+
+                gsCache = gstoreCache.init({
+                    config: {
+                        stores: [cache],
+                        ttl: {
+                            stores: { redis: { queries: 10 } },
+                        },
+                    },
+                });
+
+                const onReady = () => {
+                    sinon.spy(gsCache, 'set');
+
+                    gsCache.queries.set(query1, queryRes).then(() => {
+                        expect(gsCache.set.called).equal(true);
+                        expect(gsCache.queries.cacheQueryEntityKind.called).equal(false);
+                        done();
+                    });
+
+                    gsCache.removeAllListeners();
+                };
+                gsCache.on('ready', onReady);
+            });
+        });
     });
 
     describe('mset()', () => {
@@ -411,6 +524,57 @@ describe('gstoreCache.queries', () => {
             return gsCache.queries.set(query1, queryRes, query2, queryRes2).then(() => {
                 const { args } = gsCache.mset.getCall(0);
                 expect(args[4].ttl).equal(5);
+            });
+        });
+
+        describe('when redis cache present', () => {
+            let cache;
+
+            beforeEach(() => {
+                sinon.spy(gsCache.queries, 'cacheQueryEntityKind');
+            });
+            afterEach(() => {
+                gsCache.queries.cacheQueryEntityKind.restore();
+            });
+
+            it('should not prime the cache and save the query in its entity Kind Set', done => {
+                cache = StoreMock('redis');
+
+                gsCache = gstoreCache.init({
+                    config: {
+                        stores: [cache],
+                        ttl: {
+                            stores: { redis: { queries: 0 } },
+                        },
+                    },
+                });
+
+                const onReady = () => {
+                    sinon.spy(gsCache, 'mset');
+                    const queryKey = queryToString(query1);
+                    const queryKey2 = queryToString(query2);
+                    const queryRes2 = [{ name: string.random() }];
+
+                    gsCache.queries.set(query1, queryRes, query2, queryRes2).then(result => {
+                        expect(gsCache.mset.called).equal(false);
+                        expect(gsCache.queries.cacheQueryEntityKind.callCount).equal(2);
+
+                        const { args: args1 } = gsCache.queries.cacheQueryEntityKind.getCall(0);
+                        expect(args1[0]).equal(queryKey);
+                        expect(args1[1]).equal(queryRes);
+                        expect(args1[2]).equal('Company');
+
+                        const { args: args2 } = gsCache.queries.cacheQueryEntityKind.getCall(1);
+                        expect(args2[0]).equal(queryKey2);
+                        expect(args2[1]).equal(queryRes2);
+                        expect(args2[2]).equal('User');
+                        expect(result).deep.equal([queryRes, queryRes2]);
+                        done();
+                    });
+
+                    gsCache.removeAllListeners();
+                };
+                gsCache.on('ready', onReady);
             });
         });
     });
