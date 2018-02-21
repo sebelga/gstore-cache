@@ -12,10 +12,10 @@ https://raw.githubusercontent.com/dbader/readme-template/master/README.md
 
 gstore cache helps you speed up your Datastore entities fetching by providing an advanced cache layer on top of @google-cloud/datastore:
 
-* Define multiple cache stores with different TTL (time to live) thanks to [node-cache-manager](https://github.com/BryanDonovan/node-cache-manager).
+* Define multiple cache stores with different ttl thanks to [node-cache-manager](https://github.com/BryanDonovan/node-cache-manager).
 * LRU memory cache out of the box to speed up your application right away!
-* Datastore Key and Query objects are converted to unique string ids, easy to cache
-* Advanced cache (with [node Redis](https://github.com/NodeRedis/node_redis)) will automatically save your Queries by **Entity Kind**. You can then set an infinite TTL for your queries and only invalidate the cache when you _edit_ or _delete_ an entity Kind.
+* Datastore Key and Query objects are converted to unique string ids easy to cache
+* Advanced cache (with [node Redis](https://github.com/NodeRedis/node_redis)) will automatically save your Queries by **Entity Kind**. You can then set an infinite ttl (time to live) for your queries and only invalidate the cache when you _edit_ or _delete_ an entity Kind.
 
 ## Installation
 
