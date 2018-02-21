@@ -29,18 +29,18 @@ yarn add gstore-cache
 
 ```js
 const Datastore = require('@google-cloud/datastore');
-const GstoreCache = require('gstore-cache');
+const gstoreCache = require('gstore-cache');
 
 const datastore = new Datastore();
-const cache = GstoreCache({ datastore });
+const cache = gstoreCache.init({ datastore });
 
 const key = datastore.key(['Company', 'Google']);
 
 /**
  * The "keys.wrap()" helper will
- * - Try to fetch the entity from the cache
- * - If it is not found, fetch it from the Datastore
- * - Prime the cache with the entity data retrieve from the Datastore.
+ * - Look for the entity in the cache
+ * - If not found, fetch it from the Datastore
+ * - Prime the cache with the entity fetched from the Datastore.
  */
 cache.keys.wrap(key).then(entity => {
     console.log(entity);
@@ -70,15 +70,12 @@ The "wrap" helper above is just syntactic sugar for the following
 
 ```js
 const Datastore = require('@google-cloud/datastore');
-const GstoreCache = require('gstore-cache');
+const gstoreCache = require('gstore-cache');
+
+// After you initialized the cache (once on app launch), this is how you get its instance
+const cache = gstoreCache.instance();
 
 const datastore = new Datastore();
-const cache = GstoreCache({ datastore });
-
-// New API
-// const cache = gsCache.init({ datastore });
-// const cache = gsCache.instance();
-
 const key = datastore.key(['Company', 'Google']);
 
 cache.keys

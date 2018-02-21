@@ -6,7 +6,7 @@ const chai = require('chai');
 const sinon = require('sinon');
 const ds = require('@google-cloud/datastore')();
 
-const GstoreCache = require('../lib');
+const gstoreCache = require('../lib');
 const StoreMock = require('./mocks/cache-store');
 
 const { expect, assert } = chai;
@@ -28,7 +28,7 @@ describe('gsCache', () => {
 
     describe('init()', () => {
         it('should override the default config', done => {
-            gsCache = GstoreCache();
+            gsCache = gstoreCache.init();
 
             const { config } = gsCache;
             expect(config.ttl.keys).equal(600);
@@ -39,7 +39,7 @@ describe('gsCache', () => {
             // Wait next tick to create another cache
             // to make sure the "ready" listener is only on this new cache.
             process.nextTick(() => {
-                gsCache = GstoreCache({
+                gsCache = gstoreCache.init({
                     config: {
                         stores: [
                             {
@@ -76,7 +76,7 @@ describe('gsCache', () => {
         it('should detect redis client', () => {
             const redisCache = StoreMock('redis');
 
-            gsCache = GstoreCache({
+            gsCache = gstoreCache.init({
                 config: {
                     stores: [redisCache],
                     ttl: {
@@ -93,7 +93,7 @@ describe('gsCache', () => {
             const memoryCache = StoreMock();
             const redisCache = StoreMock('redis');
 
-            gsCache = GstoreCache({
+            gsCache = gstoreCache.init({
                 config: {
                     stores: [memoryCache, redisCache],
                     ttl: {
@@ -113,14 +113,14 @@ describe('gsCache', () => {
         });
 
         it('should return same instances', () => {
-            gsCache = GstoreCache();
-            const gstoreCache2 = GstoreCache();
+            gsCache = gstoreCache.init();
+            const gsCache2 = gstoreCache.instance();
 
-            expect(gstoreCache2).equal(gsCache);
+            expect(gsCache2).equal(gsCache);
         });
 
         it('should save google datastore instance', () => {
-            gsCache = GstoreCache({ datastore: ds });
+            gsCache = gstoreCache.init({ datastore: ds });
 
             expect(gsCache.ds).equal(ds);
         });
@@ -129,7 +129,7 @@ describe('gsCache', () => {
     describe('primeCache()', () => {
         let cacheManager;
         beforeEach(done => {
-            gsCache = GstoreCache({ datastore: ds });
+            gsCache = gstoreCache.init({ datastore: ds });
 
             const onReady = () => {
                 ({ cacheManager } = gsCache);
@@ -171,7 +171,7 @@ describe('gsCache', () => {
 
     describe('getCacheManager()', () => {
         it('should return the cache manager', done => {
-            gsCache = GstoreCache();
+            gsCache = gstoreCache.init();
             gsCache.on('ready', () => {
                 assert.isDefined(gsCache.cacheManager);
                 done();
@@ -181,7 +181,7 @@ describe('gsCache', () => {
 
     describe('deleteCacheManager()', () => {
         it('should work', done => {
-            gsCache = GstoreCache();
+            gsCache = gstoreCache.init();
 
             gsCache.deleteCacheManager(() => {
                 gsCache.deleteCacheManager(done);
@@ -191,7 +191,7 @@ describe('gsCache', () => {
 
     describe('get|mget|set|mset|del', () => {
         it('should bind to cache-manager methods', () => {
-            gsCache = GstoreCache();
+            gsCache = gstoreCache.init();
             const { cacheManager } = gsCache;
 
             expect(gsCache.get).equal(cacheManager.get);

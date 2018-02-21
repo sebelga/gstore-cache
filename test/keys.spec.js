@@ -4,7 +4,7 @@ const ds = require('@google-cloud/datastore')();
 const chai = require('chai');
 const sinon = require('sinon');
 
-const GstoreCache = require('../lib');
+const gstoreCache = require('../lib');
 const { datastore, string } = require('../lib/utils');
 const { keys, entities } = require('./mocks/datastore');
 const StoreMock = require('./mocks/cache-store');
@@ -26,7 +26,7 @@ describe('gstoreCache.keys', () => {
     };
 
     beforeEach(done => {
-        gsCache = GstoreCache({ datastore: ds });
+        gsCache = gstoreCache.init({ datastore: ds });
 
         const onReady = () => {
             keyToString = key => gsCache.config.cachePrefix.keys + datastore.dsKeyToString(key);
@@ -161,7 +161,7 @@ describe('gstoreCache.keys', () => {
             const memoryCache = StoreMock();
             const redisCache = StoreMock('redis');
 
-            gsCache = GstoreCache({
+            gsCache = gstoreCache.init({
                 config: {
                     stores: [memoryCache, redisCache],
                     ttl: {

@@ -7,7 +7,7 @@ const chai = require('chai');
 const sinon = require('sinon');
 const requireUncached = require('require-uncached');
 
-const GstoreCache = requireUncached('../lib');
+const gstoreCache = requireUncached('../lib');
 
 const ds = new Datastore({ projectId: 'gstore-cache-e2e-tests' });
 
@@ -35,7 +35,7 @@ describe('e2e (Datastore & Redis)', () => {
         }
         sinon.spy(ds, 'get');
 
-        cache = GstoreCache({ datastore: ds });
+        cache = gstoreCache.init({ datastore: ds });
         const onReady = () => {
             done();
         };

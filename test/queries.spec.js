@@ -27,11 +27,11 @@ describe('gstoreCache.queries', () => {
     };
 
     describe('wrap()', () => {
-        const GstoreCache = requireUncached('../lib');
+        const gstoreCache = requireUncached('../lib');
         let defaultConfig;
 
         beforeEach(ready => {
-            gsCache = GstoreCache();
+            gsCache = gstoreCache.init();
             defaultConfig = Object.assign({}, gsCache.config);
 
             queryRes = [{ name: string.random() }];
@@ -172,7 +172,7 @@ describe('gstoreCache.queries', () => {
             const memoryCache = StoreMock();
             const redisCache = StoreMock('redis');
 
-            gsCache = GstoreCache({
+            gsCache = gstoreCache.init({
                 config: {
                     stores: [memoryCache, redisCache],
                     ttl: {
@@ -241,7 +241,7 @@ describe('gstoreCache.queries', () => {
             it('should not prime the cache and save the query in its entity Kind Set', done => {
                 cache = StoreMock('redis');
 
-                gsCache = GstoreCache({
+                gsCache = gstoreCache.init({
                     config: {
                         stores: [cache],
                         ttl: {
@@ -276,7 +276,7 @@ describe('gstoreCache.queries', () => {
             it('should still prime the cache and *not** save query for Entity Kind', done => {
                 cache = StoreMock('redis');
 
-                gsCache = GstoreCache({
+                gsCache = gstoreCache.init({
                     config: {
                         stores: [cache],
                         ttl: {
@@ -303,10 +303,10 @@ describe('gstoreCache.queries', () => {
     });
 
     describe('get()', () => {
-        const GstoreCache = requireUncached('../lib');
+        const gstoreCache = requireUncached('../lib');
 
         beforeEach(done => {
-            gsCache = GstoreCache();
+            gsCache = gstoreCache.init();
             queryRes = [{ name: string.random() }];
 
             const onReady = () => {
@@ -337,10 +337,10 @@ describe('gstoreCache.queries', () => {
     });
 
     describe('set()', () => {
-        const GstoreCache = requireUncached('../lib');
+        const gstoreCache = requireUncached('../lib');
 
         beforeEach(done => {
-            gsCache = GstoreCache();
+            gsCache = gstoreCache.init();
             queryRes = [{ name: string.random() }];
 
             const onReady = () => {
@@ -373,10 +373,10 @@ describe('gstoreCache.queries', () => {
     });
 
     describe('mset()', () => {
-        const GstoreCache = requireUncached('../lib');
+        const gstoreCache = requireUncached('../lib');
 
         beforeEach(done => {
-            gsCache = GstoreCache();
+            gsCache = gstoreCache.init();
             queryRes = [{ name: string.random() }];
 
             const onReady = () => {
@@ -416,10 +416,10 @@ describe('gstoreCache.queries', () => {
     });
 
     describe('del()', () => {
-        const GstoreCache = requireUncached('../lib');
+        const gstoreCache = requireUncached('../lib');
 
         beforeEach(done => {
-            gsCache = GstoreCache();
+            gsCache = gstoreCache.init();
             queryRes = [{ name: string.random() }];
 
             const onReady = () => {
@@ -454,10 +454,10 @@ describe('gstoreCache.queries', () => {
     });
 
     describe('cacheQueryEntityKind', () => {
-        const GstoreCache = requireUncached('../lib');
+        const gstoreCache = requireUncached('../lib');
 
         beforeEach(done => {
-            gsCache = GstoreCache({
+            gsCache = gstoreCache.init({
                 config: {
                     stores: [StoreMock('redis')],
                 },
@@ -535,10 +535,10 @@ describe('gstoreCache.queries', () => {
     });
 
     describe('cleanQueriesEntityKind', () => {
-        const GstoreCache = requireUncached('../lib');
+        const gstoreCache = requireUncached('../lib');
 
         beforeEach(ready => {
-            gsCache = GstoreCache({
+            gsCache = gstoreCache.init({
                 config: {
                     stores: [StoreMock('redis')],
                 },
