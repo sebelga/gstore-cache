@@ -895,9 +895,9 @@ bytebuffer@~5:
   dependencies:
     long "~3"
 
-cache-manager@^2.6.0:
-  version "2.6.0"
-  resolved "https://registry.yarnpkg.com/cache-manager/-/cache-manager-2.6.0.tgz#1050d8d9a9452a80a0cf5672f1394d31ef3d4109"
+cache-manager@^2.7.0:
+  version "2.7.0"
+  resolved "https://registry.yarnpkg.com/cache-manager/-/cache-manager-2.7.0.tgz#8477802d0a257bea0d36b92420ac8998e460b09d"
   dependencies:
     async "1.5.2"
     lru-cache "4.0.0"

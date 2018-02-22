@@ -3,12 +3,14 @@
 const { argv } = require('yargs');
 
 const Datastore = require('@google-cloud/datastore');
+const cacheManager = require('cache-manager');
 const chai = require('chai');
 const sinon = require('sinon');
 const requireUncached = require('require-uncached');
+const redisStore = require('cache-manager-redis-store');
 
 const gstoreCache = requireUncached('../lib');
-// const { string } = require('../lib/utils');
+const { datastore } = require('../lib/utils');
 // const { queries } = require('./mocks/datastore');
 
 const ds = new Datastore({ projectId: 'gstore-cache-e2e-tests' });
@@ -28,11 +30,23 @@ const cleanUp = cb => {
     ds.delete(allKeys).then(cb);
 };
 
+// -------------------- Test Data ---------------------
+const k1 = ds.key(['Parent', 'default', 'User', 222]);
+const k2 = ds.key(['Parent', 'default', 'User', 333]);
+const user1 = { name: 'john', age: 20 };
+const user2 = { name: 'mick', age: 20 };
+
+const query = ds
+    .createQuery('User')
+    .filter('age', 20)
+    .hasAncestor(ds.key(['Parent', 'default']));
+// ----------------------------------------------------
+
 describe('e2e (Datastore & Memory cache)', () => {
     let cache;
 
     beforeEach(function integrationTest(done) {
-        if (!argv.e2e === true) {
+        if (argv.e2e !== true) {
             // Skip e2e tests suite
             this.skip();
         }
@@ -63,7 +77,7 @@ describe('e2e (Datastore & Memory cache)', () => {
 
     describe('gstoreCache.keys', () => {
         beforeEach(function TestGstoreCacheKeys() {
-            if (!argv.e2e === true) {
+            if (argv.e2e !== true) {
                 // Skip e2e tests suite
                 this.skip();
             }
@@ -74,21 +88,41 @@ describe('e2e (Datastore & Memory cache)', () => {
             ds.get.restore();
         });
 
-        it('should add data to cache', () =>
-            ds.save({ key: key1, data: data1 }).then(() =>
-                cache.keys.get(key1).then(result1 => {
-                    assert.isUndefined(result1); // make sure the cache is empty
-                    return ds
-                        .get(key1)
-                        .then(result2 => cache.keys.set(key1, result2[0]))
-                        .then(() => cache.keys.get(key1))
-                        .then(result3 => {
-                            expect(result3).deep.equal(data1);
-                        });
-                })
-            ));
+        describe('set()', () => {
+            it('should add data to cache', () =>
+                ds.save({ key: key1, data: data1 }).then(() =>
+                    cache.keys.get(key1).then(result1 => {
+                        assert.isUndefined(result1); // make sure the cache is empty
+                        return ds
+                            .get(key1)
+                            .then(result2 => cache.keys.set(key1, result2[0]))
+                            .then(() => cache.keys.get(key1))
+                            .then(result3 => {
+                                expect(result3).deep.equal(data1);
+                            });
+                    })
+                ));
 
-        describe('wrap', () => {
+            it('should set the key in the cache', () =>
+                cache.keys
+                    .get(key1)
+                    .then(result => {
+                        assert.isUndefined(result);
+                    })
+                    .then(() => cache.keys.set(key1, data1))
+                    .then(() => cache.keys.wrap(key1))
+                    .then(result => {
+                        expect(result).contains(data1);
+                        expect(ds.get.called).equal(false);
+                    })
+                    .then(() => cache.keys.get(key1))
+                    .then(result => {
+                        expect(result).contains(data1);
+                        expect(result[ds.KEY]).equal(key1);
+                    }));
+        });
+
+        describe('wrap()', () => {
             it('should add data to cache', () =>
                 ds.save({ key: key1, data: data1 }).then(() =>
                     cache.keys
@@ -110,57 +144,238 @@ describe('e2e (Datastore & Memory cache)', () => {
                     assert.isUndefined(result);
                 }));
         });
-
-        describe('set', () => {
-            it('should set the key in the cache', () =>
-                cache.keys
-                    .get(key1)
-                    .then(result => {
-                        assert.isUndefined(result);
-                    })
-                    .then(() => cache.keys.set(key1, data1))
-                    .then(() => cache.keys.wrap(key1))
-                    .then(result => {
-                        expect(result).contains(data1);
-                        expect(ds.get.called).equal(false);
-                    })
-                    .then(() => cache.keys.get(key1))
-                    .then(result => {
-                        expect(result).contains(data1);
-                        expect(result[ds.KEY]).equal(key1);
-                    }));
-        });
     });
 
     describe('gstoreCache.queries', () => {
-        const k1 = ds.key(['Parent', 'default', 'User', 222]);
-        const k2 = ds.key(['Parent', 'default', 'User', 333]);
-        const user1 = { name: 'john', age: 20 };
-        const user2 = { name: 'mick', age: 20 };
-
-        const query = ds
-            .createQuery('User')
-            .filter('age', 20)
-            .hasAncestor(ds.key(['Parent', 'default']));
-
         beforeEach(function TestGstoreCacheQueries(done) {
-            if (!argv.e2e === true) {
+            if (argv.e2e !== true) {
                 // Skip e2e tests suite
                 this.skip();
             }
             ds.save([{ key: k1, data: user1 }, { key: k2, data: user2 }]).then(() => done());
         });
 
-        it('should add query data to cache', () =>
-            cache.queries.get(query).then(result1 => {
-                assert.isUndefined(result1); // make sure the cache is empty
-                return query
-                    .run()
-                    .then(result2 => cache.queries.set(query, result2[0]))
-                    .then(() => cache.queries.get(query))
-                    .then(result3 => {
-                        expect(result3).deep.equal([user1, user2]);
-                    });
-            }));
+        describe('set()', () => {
+            it('should add query data to cache', () =>
+                cache.queries.get(query).then(result1 => {
+                    assert.isUndefined(result1); // make sure the cache is empty
+                    return query
+                        .run()
+                        .then(result2 => cache.queries.set(query, result2))
+                        .then(() => cache.queries.get(query))
+                        .then(result3 => {
+                            const [entities] = result3;
+                            expect(entities).deep.equal([user1, user2]);
+                        });
+                }));
+        });
+    });
+});
+
+describe('e2e (Datastore & Redis cache)', () => {
+    let cache;
+    let redisClient;
+    let queryToString;
+
+    beforeEach(function integrationTest(done) {
+        if (argv.e2e !== true) {
+            // Skip e2e tests suite
+            this.skip();
+        }
+
+        const memoryCache = cacheManager.caching({ store: 'memory' });
+        const redisCache = cacheManager.caching({ store: redisStore });
+        redisClient = redisCache.store.getClient();
+
+        cache = gstoreCache.init({
+            config: {
+                stores: [memoryCache, redisCache],
+            },
+            datastore: ds,
+        });
+        const onReady = () => {
+            const prefix = cache.config.cachePrefix.queries;
+            queryToString = q => prefix + datastore.dsQueryToString(q);
+            done();
+        };
+        cache.on('ready', onReady);
+    });
+
+    afterEach(done => {
+        cache.removeAllListeners();
+        cache.deleteCacheManager(() => {
+            cleanUp(() => done());
+        });
+    });
+
+    describe('gstoreCache.queries', () => {
+        beforeEach(function TestGstoreCacheQueries(done) {
+            if (argv.e2e !== true) {
+                // Skip e2e tests suite
+                this.skip();
+            }
+            ds.save([{ key: k1, data: user1 }, { key: k2, data: user2 }]).then(() => done());
+        });
+
+        describe('set()', () => {
+            it('should add query data to Redis Cache + EntityKind Set', () =>
+                cache.queries.get(query).then(result1 => {
+                    assert.isUndefined(result1); // make sure the cache is empty
+                    return query
+                        .run()
+                        .then(result2 => cache.queries.set(query, result2))
+                        .then(
+                            () =>
+                                new Promise((resolve, reject) => {
+                                    redisClient.get(queryToString(query), (err, data) => {
+                                        if (err) {
+                                            return reject(err);
+                                        }
+                                        return resolve(JSON.parse(data));
+                                    });
+                                })
+                        )
+                        .then(result3 => {
+                            const [entities] = result3;
+                            expect(entities).deep.equal([user1, user2]);
+                        })
+                        .then(
+                            () =>
+                                new Promise((resolve, reject) => {
+                                    redisClient.scard('gcq:User', (err, total) => {
+                                        if (err) {
+                                            return reject(err);
+                                        }
+                                        expect(total).equal(1);
+                                        return resolve();
+                                    });
+                                })
+                        );
+                }));
+        });
+
+        describe('wrap()', () => {
+            it('should add query data to Redis Cache + EntityKind Set', () =>
+                cache.queries.get(query).then(result1 => {
+                    assert.isUndefined(result1); // make sure the cache is empty
+                    return cache.queries
+                        .wrap(query)
+                        .then(
+                            () =>
+                                new Promise((resolve, reject) => {
+                                    redisClient.get(queryToString(query), (err, data) => {
+                                        if (err) {
+                                            return reject(err);
+                                        }
+                                        return resolve(JSON.parse(data));
+                                    });
+                                })
+                        )
+                        .then(result3 => {
+                            const [entities, meta] = result3;
+                            expect(entities).deep.equal([user1, user2]);
+                            assert.isDefined(meta.endCursor);
+                        })
+                        .then(
+                            () =>
+                                new Promise((resolve, reject) => {
+                                    redisClient.scard('gcq:User', (err, total) => {
+                                        if (err) {
+                                            return reject(err);
+                                        }
+                                        expect(total).equal(1);
+                                        return resolve();
+                                    });
+                                })
+                        );
+                }));
+        });
+
+        describe('cacheQueryEntityKind()', () => {
+            const queryKey = 'my-query-key';
+            const queryData = [{ id: 1, title: 'Post title', author: { name: 'John Snow' } }];
+
+            it('should add query data to Redis Cache + multiple EntityKind Set', () =>
+                cache.get(queryKey).then(result1 => {
+                    assert.isUndefined(result1); // make sure the cache is empty
+                    return cache.queries
+                        .cacheQueryEntityKind(queryKey, queryData, ['Post', 'Author'])
+                        .then(
+                            () =>
+                                new Promise((resolve, reject) => {
+                                    redisClient.get(queryKey, (err, data) => {
+                                        if (err) {
+                                            return reject(err);
+                                        }
+                                        return resolve(JSON.parse(data));
+                                    });
+                                })
+                        )
+                        .then(result2 => {
+                            expect(result2).deep.equal(queryData);
+                        })
+                        .then(
+                            () =>
+                                new Promise((resolve, reject) => {
+                                    redisClient.scard('gcq:Post', (err, total) => {
+                                        if (err) {
+                                            return reject(err);
+                                        }
+                                        expect(total).equal(1);
+                                        return resolve();
+                                    });
+                                })
+                        )
+                        .then(
+                            () =>
+                                new Promise((resolve, reject) => {
+                                    redisClient.scard('gcq:Author', (err, total) => {
+                                        if (err) {
+                                            return reject(err);
+                                        }
+                                        expect(total).equal(1);
+                                        return resolve();
+                                    });
+                                })
+                        );
+                }));
+        });
+
+        describe('cleanQueriesEntityKind()', () => {
+            it('should delete cache and remove from EntityKindSet', () =>
+                cache.queries.get(query).then(result1 => {
+                    assert.isUndefined(result1); // make sure the cache is empty
+                    return query
+                        .run()
+                        .then(result2 => cache.queries.set(query, result2))
+                        .then(() => cache.queries.cleanQueriesEntityKind('User'))
+                        .then(
+                            () =>
+                                // Check that Query Cache does not exist anymore
+                                new Promise((resolve, reject) => {
+                                    redisClient.get(queryToString(query), (err, data) => {
+                                        if (err) {
+                                            return reject(err);
+                                        }
+                                        expect(data).equal(null);
+                                        return resolve();
+                                    });
+                                })
+                        )
+                        .then(
+                            () =>
+                                // Check that the Set does not contains any more Queries
+                                new Promise((resolve, reject) => {
+                                    redisClient.scard('gcq:User', (err, total) => {
+                                        if (err) {
+                                            return reject(err);
+                                        }
+                                        expect(total).equal(0);
+                                        return resolve();
+                                    });
+                                })
+                        );
+                }));
+        });
     });
 });

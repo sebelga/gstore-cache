@@ -9,6 +9,10 @@ const { queries } = require('./mocks/datastore');
 const StoreMock = require('./mocks/cache-store');
 
 const { expect, assert } = chai;
+const metaQuery = {
+    endCursor: 'Cj4SOGoWZ3N0b3JlLWNhY2hlLWUyZS10Z==',
+    moreResults: 'MORE_RESULTS_AFTER_LIMIT',
+};
 
 describe('gstoreCache.queries', () => {
     let gsCache;
@@ -34,7 +38,7 @@ describe('gstoreCache.queries', () => {
             gsCache = gstoreCache.init();
             defaultConfig = Object.assign({}, gsCache.config);
 
-            queryRes = [{ name: string.random() }];
+            queryRes = [[{ name: string.random() }], metaQuery];
             sinon.spy(methods, 'fetchHandler');
 
             const onReady = () => {
@@ -324,7 +328,7 @@ describe('gstoreCache.queries', () => {
             ));
 
         it('should get multiple queries from cache', () => {
-            const queryRes2 = [{ name: string.random() }];
+            const queryRes2 = [[{ name: string.random() }], metaQuery];
             return gsCache.queries.mset(query1, queryRes, query2, queryRes2).then(() =>
                 gsCache.queries.mget(query1, query2).then(res => {
                     expect(res[0]).equal(queryRes);
@@ -507,7 +511,7 @@ describe('gstoreCache.queries', () => {
         });
 
         it('should add Datastore Query to cache', () => {
-            const queryRes2 = [{ name: string.random() }];
+            const queryRes2 = [[{ name: string.random() }], metaQuery];
             return gsCache.queries.mset(query1, queryRes, query2, queryRes2).then(result => {
                 assert.ok(gsCache.mset.called);
                 const { args } = gsCache.mset.getCall(0);
@@ -520,7 +524,7 @@ describe('gstoreCache.queries', () => {
         });
 
         it('should set the TTL from config', () => {
-            const queryRes2 = [{ name: string.random() }];
+            const queryRes2 = [[{ name: string.random() }], metaQuery];
             return gsCache.queries.set(query1, queryRes, query2, queryRes2).then(() => {
                 const { args } = gsCache.mset.getCall(0);
                 expect(args[4].ttl).equal(5);
@@ -553,7 +557,7 @@ describe('gstoreCache.queries', () => {
                     sinon.spy(gsCache, 'mset');
                     const queryKey = queryToString(query1);
                     const queryKey2 = queryToString(query2);
-                    const queryRes2 = [{ name: string.random() }];
+                    const queryRes2 = [[{ name: string.random() }], metaQuery];
 
                     gsCache.queries.set(query1, queryRes, query2, queryRes2).then(result => {
                         expect(gsCache.mset.called).equal(false);
@@ -662,7 +666,7 @@ describe('gstoreCache.queries', () => {
             const queryKey = queryToString(query1);
             sinon.spy(redisClient, 'multi');
 
-            return gsCache.queries.cacheQueryEntityKind(queryKey, queryRes, 'User', 'Task', 'Post').then(() => {
+            return gsCache.queries.cacheQueryEntityKind(queryKey, queryRes, ['User', 'Task', 'Post']).then(() => {
                 assert.ok(redisClient.multi.called);
                 const { args } = redisClient.multi.getCall(0);
                 expect(args[0][0]).deep.equal(['sadd', `${prefix}User`, queryKey]);
