@@ -295,7 +295,7 @@ describe('e2e (Datastore & Redis cache)', () => {
             const queryKey = 'my-query-key';
             const queryData = [{ id: 1, title: 'Post title', author: { name: 'John Snow' } }];
 
-            it('should add query data to Redis Cache + multiple EntityKind Set', () =>
+            it('should add query data to Redis Cache with multiple Entity Kinds', () =>
                 cache.get(queryKey).then(result1 => {
                     assert.isUndefined(result1); // make sure the cache is empty
                     return cache.queries
@@ -342,7 +342,7 @@ describe('e2e (Datastore & Redis cache)', () => {
         });
 
         describe('cleanQueriesEntityKind()', () => {
-            it('should delete cache and remove from EntityKindSet', () =>
+            it('should delete cache and remove from EntityKind Set', () =>
                 cache.queries.get(query).then(result1 => {
                     assert.isUndefined(result1); // make sure the cache is empty
                     return query
@@ -376,6 +376,50 @@ describe('e2e (Datastore & Redis cache)', () => {
                                 })
                         );
                 }));
+
+            it('should delete cache and remove from multiple EntityKind Set', () => {
+                const queryKey = 'my-query-key';
+                const queryData = [{ id: 1, title: 'Post title', author: { name: 'John Snow' } }];
+
+                return cache.get(queryKey).then(result1 => {
+                    assert.isUndefined(result1); // make sure the cache is empty
+                    return cache.queries
+                        .cacheQueryEntityKind(queryKey, queryData, ['Post', 'Author'])
+                        .then(
+                            () =>
+                                new Promise((resolve, reject) => {
+                                    redisClient
+                                        .multi([['get', queryKey], ['scard', 'gcq:Post'], ['scard', 'gcq:Author']])
+                                        .exec((err, response) => {
+                                            if (err) {
+                                                return reject(err);
+                                            }
+                                            expect(JSON.parse(response[0])).deep.equal(queryData);
+                                            expect(response[1]).equal(1);
+                                            expect(response[2]).equal(1);
+                                            return resolve();
+                                        });
+                                })
+                        )
+                        .then(() => cache.queries.cleanQueriesEntityKind(['Post', 'Author']))
+                        .then(
+                            () =>
+                                new Promise((resolve, reject) => {
+                                    redisClient
+                                        .multi([['get', queryKey], ['scard', 'gcq:Post'], ['scard', 'gcq:Author']])
+                                        .exec((err, response) => {
+                                            if (err) {
+                                                return reject(err);
+                                            }
+                                            expect(response[0]).equal(null);
+                                            expect(response[1]).equal(0);
+                                            expect(response[2]).equal(0);
+                                            return resolve();
+                                        });
+                                })
+                        );
+                });
+            });
         });
     });
 });
