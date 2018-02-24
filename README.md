@@ -12,10 +12,10 @@ https://raw.githubusercontent.com/dbader/readme-template/master/README.md
 
 gstore cache helps you speed up your Datastore entities fetching by providing an advanced cache layer on top of @google-cloud/datastore:
 
-* Define multiple cache stores with different ttl thanks to [node-cache-manager](https://github.com/BryanDonovan/node-cache-manager).
+* Define multiple cache stores with different TTL thanks to [node-cache-manager](https://github.com/BryanDonovan/node-cache-manager).
 * LRU memory cache out of the box to speed up your application right away!
-* Datastore Key and Query objects are converted to unique string ids easy to cache
-* Advanced cache (with [node Redis](https://github.com/NodeRedis/node_redis)) will automatically save your Queries by **Entity Kind**. You can then set an infinite ttl (time to live) for your queries and only invalidate the cache when you _edit_ or _delete_ an entity Kind.
+* Datastore Key and Query objects are converted to **unique string ids** easy to cache
+* Advanced cache (when using [node Redis](https://github.com/NodeRedis/node_redis)) that automatically saves your Queries in Redis "Sets" by **Entity Kind**. You can then set an infinite TTL (time to live) for your queries and only invalidate the cache when you either _edit_ or _delete_ an entity Kind.
 
 ## Installation
 
@@ -26,6 +26,8 @@ yarn add gstore-cache
 ```
 
 ## Usage example
+
+### Datastore Keys
 
 ```js
 const Datastore = require('@google-cloud/datastore');
@@ -50,7 +52,7 @@ cache.keys.wrap(key).then(entity => {
 /**
  * You can also pass several keys.
  * gstore-cache will first check the cache and only fetch from the Datastore
- * the keys *not* found.
+ * the keys that were *not* found in the cache.
  *
  * In the example below, only the "key3" would be passed to datastore.get() and
  * fetched from the Datastore
@@ -72,7 +74,7 @@ The "wrap" helper above is just syntactic sugar for the following
 const Datastore = require('@google-cloud/datastore');
 const gstoreCache = require('gstore-cache');
 
-// After you initialized the cache (once on app launch), this is how you get its instance
+// After you initialized the cache (once at app bootstrap), this is how you get its instance
 const cache = gstoreCache.instance();
 
 const datastore = new Datastore();
@@ -99,6 +101,36 @@ cache.keys
     .then(entity => {
         console.log(entity);
     });
+```
+
+### Datastore Queries
+
+```js
+const Datastore = require('@google-cloud/datastore');
+const gstoreCache = require('gstore-cache');
+
+const datastore = new Datastore();
+const cache = gstoreCache.init({ datastore });
+
+const query = datastore
+    .createQuery('Post')
+    .filter('category', 'tech')
+    .order('updatedOn')
+    .limit(10);
+
+/**
+ * Just like with the Keys, the "queries.wrap()" helper will
+ * - Look for the query in the cache
+ * - If not found, run the query on the Datastore
+ * - Prime the cache with the response of the query.
+ */
+cache.queries.wrap(query).then(response => {
+    const [entities, meta] = response;
+
+    console.log(entities);
+    console.log(entities[0][datastore.KEY]); // KEY Symbol are saved in Cache too
+    console.log(meta.moreResults);
+});
 ```
 
 ## Development setup

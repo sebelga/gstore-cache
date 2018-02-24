@@ -231,14 +231,28 @@ describe('e2e (Datastore & Redis cache)', () => {
                                         if (err) {
                                             return reject(err);
                                         }
-                                        return resolve(JSON.parse(data));
+                                        const response = JSON.parse(data);
+                                        const [entities] = response;
+                                        expect(entities[0]).contains(user1);
+                                        expect(entities[1]).contains(user2);
+
+                                        // Make sure we saved the KEY Symbol
+                                        assert.isDefined(entities[0].__dsKey__);
+                                        assert.isDefined(entities[1].__dsKey__);
+                                        return resolve();
                                     });
                                 })
                         )
-                        .then(result3 => {
-                            const [entities] = result3;
-                            expect(entities).deep.equal([user1, user2]);
-                        })
+                        .then(() =>
+                            cache.queries.get(query).then(response => {
+                                const [entities] = response;
+                                // Make sure we put back from the Cache the Symbol
+                                assert.isDefined(entities[0][ds.KEY]);
+                                assert.isDefined(entities[1][ds.KEY]);
+                                expect(entities[0][ds.KEY].id).equal('222');
+                                expect(entities[1][ds.KEY].id).equal('333');
+                            })
+                        )
                         .then(
                             () =>
                                 new Promise((resolve, reject) => {
@@ -260,6 +274,11 @@ describe('e2e (Datastore & Redis cache)', () => {
                     assert.isUndefined(result1); // make sure the cache is empty
                     return cache.queries
                         .wrap(query)
+                        .then(response => {
+                            const [entities] = response;
+                            assert.isDefined(entities[0][ds.KEY]);
+                            assert.isDefined(entities[1][ds.KEY]);
+                        })
                         .then(
                             () =>
                                 new Promise((resolve, reject) => {
@@ -267,15 +286,29 @@ describe('e2e (Datastore & Redis cache)', () => {
                                         if (err) {
                                             return reject(err);
                                         }
-                                        return resolve(JSON.parse(data));
+                                        const response = JSON.parse(data);
+                                        const [entities, meta] = response;
+                                        expect(entities[0]).contains(user1);
+                                        expect(entities[1]).contains(user2);
+                                        assert.isDefined(meta.endCursor);
+
+                                        // Make sure we saved the KEY Symbol
+                                        assert.isDefined(entities[0].__dsKey__);
+                                        assert.isDefined(entities[1].__dsKey__);
+                                        return resolve();
                                     });
                                 })
                         )
-                        .then(result3 => {
-                            const [entities, meta] = result3;
-                            expect(entities).deep.equal([user1, user2]);
-                            assert.isDefined(meta.endCursor);
-                        })
+                        .then(() =>
+                            cache.queries.get(query).then(response => {
+                                const [entities] = response;
+                                // Make sure we put back from the Cache the Symbol
+                                assert.isDefined(entities[0][ds.KEY]);
+                                assert.isDefined(entities[1][ds.KEY]);
+                                expect(entities[0][ds.KEY].id).equal('222');
+                                expect(entities[1][ds.KEY].id).equal('333');
+                            })
+                        )
                         .then(
                             () =>
                                 new Promise((resolve, reject) => {

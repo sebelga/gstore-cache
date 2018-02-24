@@ -3,6 +3,7 @@
 const chai = require('chai');
 const sinon = require('sinon');
 const requireUncached = require('require-uncached');
+const ds = require('@google-cloud/datastore')();
 
 const { datastore, string } = require('../lib/utils');
 const { queries } = require('./mocks/datastore');
@@ -250,6 +251,7 @@ describe('gstoreCache.queries', () => {
                             stores: { redis: { queries: 0 } }, // when set to "0" triggers infinite cache
                         },
                     },
+                    datastore: ds,
                 });
 
                 const onReady = () => {
@@ -264,7 +266,8 @@ describe('gstoreCache.queries', () => {
 
                         const { args } = gsCache.queries.cacheQueryEntityKind.getCall(0);
                         expect(args[0]).equal(queryKey);
-                        expect(args[1]).equal(queryRes);
+                        expect(args[1][0][0]).contains(queryRes[0][0]);
+                        expect(args[1][1]).equal(queryRes[1]);
                         expect(args[2]).equal('Company');
                         expect(result).equal(queryRes);
                         done();
@@ -285,6 +288,7 @@ describe('gstoreCache.queries', () => {
                             stores: { redis: { queries: 10 } },
                         },
                     },
+                    datastore: ds,
                 });
 
                 const onReady = () => {
@@ -309,7 +313,7 @@ describe('gstoreCache.queries', () => {
 
         beforeEach(done => {
             gsCache = gstoreCache.init();
-            queryRes = [{ name: string.random() }];
+            queryRes = [{ name: string.random() }, metaQuery];
 
             const onReady = () => {
                 prefix = gsCache.config.cachePrefix.queries;
@@ -323,7 +327,7 @@ describe('gstoreCache.queries', () => {
         it('should get query from cache', () =>
             gsCache.queries.set(query1, queryRes).then(() =>
                 gsCache.queries.get(query1).then(res => {
-                    expect(res).equal(queryRes);
+                    expect(res).deep.equal(queryRes);
                 })
             ));
 
@@ -331,8 +335,8 @@ describe('gstoreCache.queries', () => {
             const queryRes2 = [[{ name: string.random() }], metaQuery];
             return gsCache.queries.mset(query1, queryRes, query2, queryRes2).then(() =>
                 gsCache.queries.mget(query1, query2).then(res => {
-                    expect(res[0]).equal(queryRes);
-                    expect(res[1]).equal(queryRes2);
+                    expect(res[0]).deep.equal(queryRes);
+                    expect(res[1]).deep.equal(queryRes2);
                 })
             );
         });
@@ -343,7 +347,7 @@ describe('gstoreCache.queries', () => {
 
         beforeEach(done => {
             gsCache = gstoreCache.init();
-            queryRes = [{ name: string.random() }];
+            queryRes = [[{ name: string.random() }], metaQuery];
 
             const onReady = () => {
                 prefix = gsCache.config.cachePrefix.queries;
@@ -438,6 +442,7 @@ describe('gstoreCache.queries', () => {
                             stores: { redis: { queries: 0 } },
                         },
                     },
+                    datastore: ds,
                 });
 
                 const onReady = () => {
@@ -450,7 +455,8 @@ describe('gstoreCache.queries', () => {
 
                         const { args } = gsCache.queries.cacheQueryEntityKind.getCall(0);
                         expect(args[0]).equal(queryKey);
-                        expect(args[1]).equal(queryRes);
+                        expect(args[1][0][0]).contains(queryRes[0][0]);
+                        expect(args[1][1]).equal(queryRes[1]);
                         expect(args[2]).equal('Company');
                         expect(result).equal(queryRes);
                         done();
@@ -471,6 +477,7 @@ describe('gstoreCache.queries', () => {
                             stores: { redis: { queries: 10 } },
                         },
                     },
+                    datastore: ds,
                 });
 
                 const onReady = () => {
@@ -494,7 +501,7 @@ describe('gstoreCache.queries', () => {
 
         beforeEach(done => {
             gsCache = gstoreCache.init();
-            queryRes = [{ name: string.random() }];
+            queryRes = [[{ name: string.random() }], metaQuery];
 
             const onReady = () => {
                 prefix = gsCache.config.cachePrefix.queries;
@@ -551,6 +558,7 @@ describe('gstoreCache.queries', () => {
                             stores: { redis: { queries: 0 } },
                         },
                     },
+                    datastore: ds,
                 });
 
                 const onReady = () => {
@@ -559,18 +567,20 @@ describe('gstoreCache.queries', () => {
                     const queryKey2 = queryToString(query2);
                     const queryRes2 = [[{ name: string.random() }], metaQuery];
 
-                    gsCache.queries.set(query1, queryRes, query2, queryRes2).then(result => {
+                    gsCache.queries.mset(query1, queryRes, query2, queryRes2).then(result => {
                         expect(gsCache.mset.called).equal(false);
                         expect(gsCache.queries.cacheQueryEntityKind.callCount).equal(2);
 
                         const { args: args1 } = gsCache.queries.cacheQueryEntityKind.getCall(0);
-                        expect(args1[0]).equal(queryKey);
-                        expect(args1[1]).equal(queryRes);
-                        expect(args1[2]).equal('Company');
+                        const [qKey, qValue, qEntiyKind] = args1;
+                        expect(qKey).equal(queryKey);
+                        expect(qValue[0][0]).contains(queryRes[0][0]);
+                        expect(qValue[1]).equal(queryRes[1]);
+                        expect(qEntiyKind).equal('Company');
 
                         const { args: args2 } = gsCache.queries.cacheQueryEntityKind.getCall(1);
                         expect(args2[0]).equal(queryKey2);
-                        expect(args2[1]).equal(queryRes2);
+                        expect(args2[1][0][0]).contains(queryRes2[0][0]);
                         expect(args2[2]).equal('User');
                         expect(result).deep.equal([queryRes, queryRes2]);
                         done();
@@ -588,7 +598,7 @@ describe('gstoreCache.queries', () => {
 
         beforeEach(done => {
             gsCache = gstoreCache.init();
-            queryRes = [{ name: string.random() }];
+            queryRes = [{ name: string.random() }, metaQuery];
 
             const onReady = () => {
                 sinon.spy(gsCache, 'del');
@@ -630,7 +640,7 @@ describe('gstoreCache.queries', () => {
                     stores: [StoreMock('redis')],
                 },
             });
-            queryRes = [{ name: string.random() }];
+            queryRes = [{ name: string.random() }, metaQuery];
             sinon.spy(methods, 'fetchHandler');
 
             const onReady = () => {
@@ -709,7 +719,7 @@ describe('gstoreCache.queries', () => {
                     stores: [StoreMock('redis')],
                 },
             });
-            queryRes = [{ name: string.random() }];
+            queryRes = [{ name: string.random() }, metaQuery];
             sinon.spy(methods, 'fetchHandler');
 
             const onReady = () => {
