@@ -4,6 +4,7 @@ const chai = require('chai');
 const sinon = require('sinon');
 const requireUncached = require('require-uncached');
 const ds = require('@google-cloud/datastore')();
+const nodeCacheManager = require('cache-manager');
 
 const { datastore, string } = require('../lib/utils');
 const { queries } = require('./mocks/datastore');
@@ -174,12 +175,16 @@ describe('gstoreCache.queries', () => {
         });
 
         it('should set ttl dynamically when multistore', done => {
-            const memoryCache = StoreMock();
-            const redisCache = StoreMock('redis');
+            const stores = {};
+            sinon.stub(nodeCacheManager, 'caching').callsFake(storeName => {
+                const store = StoreMock(storeName);
+                stores[storeName] = store;
+                return store;
+            });
 
             gsCache = gstoreCache.init({
                 config: {
-                    stores: [memoryCache, redisCache],
+                    stores: ['memory', 'redis'],
                     ttl: {
                         stores: {
                             memory: {
@@ -197,20 +202,21 @@ describe('gstoreCache.queries', () => {
                 gsCache.removeAllListeners();
 
                 sinon.spy(gsCache.cacheManager, 'mset');
-                sinon.spy(memoryCache.store, 'set');
-                sinon.spy(redisCache.store, 'set');
+                sinon.spy(stores.memory.store, 'set');
+                sinon.spy(stores.redis.store, 'set');
 
                 return gsCache.queries.wrap(query1, methods.fetchHandler).then(() => {
                     const options = gsCache.cacheManager.mset.getCall(0).args[2];
-                    const optMemory = memoryCache.store.set.getCall(0).args[2];
-                    const optRedis = redisCache.store.set.getCall(0).args[2];
+                    const optMemory = stores.memory.store.set.getCall(0).args[2];
+                    const optRedis = stores.redis.store.set.getCall(0).args[2];
 
                     expect(typeof options.ttl).equal('function');
                     expect(optMemory.ttl).equal(1357);
                     expect(optRedis.ttl).equal(2468);
 
-                    memoryCache.store.set.restore();
-                    redisCache.store.set.restore();
+                    stores.memory.store.set.restore();
+                    stores.redis.store.set.restore();
+                    nodeCacheManager.caching.restore();
                     done();
                 });
             };
@@ -378,12 +384,16 @@ describe('gstoreCache.queries', () => {
             }));
 
         it('should set ttl dynamically when multistore', done => {
-            const memoryCache = StoreMock();
-            const redisCache = StoreMock('redis');
+            const stores = {};
+            sinon.stub(nodeCacheManager, 'caching').callsFake(storeName => {
+                const store = StoreMock(storeName);
+                stores[storeName] = store;
+                return store;
+            });
 
             gsCache = gstoreCache.init({
                 config: {
-                    stores: [memoryCache, redisCache],
+                    stores: ['memory', 'redis'],
                     ttl: {
                         stores: {
                             memory: {
@@ -401,20 +411,21 @@ describe('gstoreCache.queries', () => {
                 gsCache.removeAllListeners();
 
                 sinon.spy(gsCache, 'set');
-                sinon.spy(memoryCache.store, 'set');
-                sinon.spy(redisCache.store, 'set');
+                sinon.spy(stores.memory.store, 'set');
+                sinon.spy(stores.redis.store, 'set');
 
                 return gsCache.queries.set(query1, queryRes).then(() => {
                     const options = gsCache.set.getCall(0).args[2];
-                    const optMemory = memoryCache.store.set.getCall(0).args[2];
-                    const optRedis = redisCache.store.set.getCall(0).args[2];
+                    const optMemory = stores.memory.store.set.getCall(0).args[2];
+                    const optRedis = stores.redis.store.set.getCall(0).args[2];
 
                     expect(typeof options.ttl).equal('function');
                     expect(optMemory.ttl).equal(1357);
                     expect(optRedis.ttl).equal(2468);
 
-                    memoryCache.store.set.restore();
-                    redisCache.store.set.restore();
+                    stores.memory.store.set.restore();
+                    stores.redis.store.set.restore();
+                    nodeCacheManager.caching.restore();
                     done();
                 });
             };
@@ -699,7 +710,7 @@ describe('gstoreCache.queries', () => {
             });
         });
 
-        it('should bubbble up error', () => {
+        it('should bubble up error', () => {
             const error = new Error('Houston we got a problem');
             sinon.stub(redisClient, 'multi').callsFake(() => ({ exec: cb => cb(error) }));
 
@@ -707,6 +718,20 @@ describe('gstoreCache.queries', () => {
                 expect(err).equal(error);
                 redisClient.multi.restore();
             });
+        });
+
+        it('should throw an Error if no Redis client', done => {
+            gsCache = gstoreCache.init({});
+
+            const onReady = () => {
+                gsCache.removeListener('ready', onReady);
+
+                gsCache.queries.cacheQueryEntityKind().catch(err => {
+                    expect(err.message).equal('No Redis Client found.');
+                    done();
+                });
+            };
+            gsCache.on('ready', onReady);
         });
     });
 
@@ -783,6 +808,20 @@ describe('gstoreCache.queries', () => {
                 redisClient.del.restore();
                 done();
             });
+        });
+
+        it('should throw an Error if no Redis client', done => {
+            gsCache = gstoreCache.init({});
+
+            const onReady = () => {
+                gsCache.removeListener('ready', onReady);
+
+                gsCache.queries.cleanQueriesEntityKind('EntiyKind').catch(err => {
+                    expect(err.message).equal('No Redis Client found.');
+                    done();
+                });
+            };
+            gsCache.on('ready', onReady);
         });
     });
 });

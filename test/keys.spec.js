@@ -3,6 +3,7 @@
 const ds = require('@google-cloud/datastore')();
 const chai = require('chai');
 const sinon = require('sinon');
+const nodeCacheManager = require('cache-manager');
 
 const gstoreCache = require('../lib');
 const { datastore, string } = require('../lib/utils');
@@ -158,12 +159,16 @@ describe('gstoreCache.keys', () => {
         });
 
         it('should set ttl dynamically when multistore', done => {
-            const memoryCache = StoreMock();
-            const redisCache = StoreMock('redis');
+            const stores = {};
+            sinon.stub(nodeCacheManager, 'caching').callsFake(storeName => {
+                const store = StoreMock(storeName);
+                stores[storeName] = store;
+                return store;
+            });
 
             gsCache = gstoreCache.init({
                 config: {
-                    stores: [memoryCache, redisCache],
+                    stores: ['memory', 'redis'],
                     ttl: {
                         stores: {
                             memory: {
@@ -181,22 +186,23 @@ describe('gstoreCache.keys', () => {
                 gsCache.removeAllListeners();
 
                 sinon.spy(gsCache.cacheManager, 'mset');
-                sinon.spy(memoryCache.store, 'set');
-                sinon.spy(redisCache.store, 'set');
+                sinon.spy(stores.memory.store, 'set');
+                sinon.spy(stores.redis.store, 'set');
                 sinon.stub(methods, 'fetchHandler').resolves(entity1);
 
                 return gsCache.keys.wrap(key1, methods.fetchHandler).then(() => {
                     const options = gsCache.cacheManager.mset.getCall(0).args[2];
-                    const optMemory = memoryCache.store.set.getCall(0).args[2];
-                    const optRedis = redisCache.store.set.getCall(0).args[2];
+                    const optMemory = stores.memory.store.set.getCall(0).args[2];
+                    const optRedis = stores.redis.store.set.getCall(0).args[2];
 
                     expect(typeof options.ttl).equal('function');
                     expect(optMemory.ttl).equal(1357);
                     expect(optRedis.ttl).equal(2468);
 
                     gsCache.deleteCacheManager(() => {
-                        memoryCache.store.set.restore();
-                        redisCache.store.set.restore();
+                        stores.memory.store.set.restore();
+                        stores.redis.store.set.restore();
+                        nodeCacheManager.caching.restore();
                         done();
                     });
                 });
@@ -331,12 +337,16 @@ describe('gstoreCache.keys', () => {
         });
 
         it('should set ttl dynamically when multistore', done => {
-            const memoryCache = StoreMock();
-            const redisCache = StoreMock('redis');
+            const stores = {};
+            sinon.stub(nodeCacheManager, 'caching').callsFake(storeName => {
+                const store = StoreMock(storeName);
+                stores[storeName] = store;
+                return store;
+            });
 
             gsCache = gstoreCache.init({
                 config: {
-                    stores: [memoryCache, redisCache],
+                    stores: ['memory', 'redis'],
                     ttl: {
                         stores: {
                             memory: {
@@ -354,21 +364,22 @@ describe('gstoreCache.keys', () => {
                 gsCache.removeAllListeners();
 
                 sinon.spy(gsCache, 'set');
-                sinon.spy(memoryCache.store, 'set');
-                sinon.spy(redisCache.store, 'set');
+                sinon.spy(stores.memory.store, 'set');
+                sinon.spy(stores.redis.store, 'set');
                 sinon.stub(methods, 'fetchHandler').resolves(entity1);
 
                 return gsCache.keys.set(key1, entity1).then(() => {
                     const options = gsCache.set.getCall(0).args[2];
-                    const optMemory = memoryCache.store.set.getCall(0).args[2];
-                    const optRedis = redisCache.store.set.getCall(0).args[2];
+                    const optMemory = stores.memory.store.set.getCall(0).args[2];
+                    const optRedis = stores.redis.store.set.getCall(0).args[2];
 
                     expect(typeof options.ttl).equal('function');
                     expect(optMemory.ttl).equal(1357);
                     expect(optRedis.ttl).equal(2468);
 
-                    memoryCache.store.set.restore();
-                    redisCache.store.set.restore();
+                    stores.memory.store.set.restore();
+                    stores.redis.store.set.restore();
+                    nodeCacheManager.caching.restore();
                     done();
                 });
             };

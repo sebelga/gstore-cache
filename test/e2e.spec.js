@@ -3,7 +3,6 @@
 const { argv } = require('yargs');
 
 const Datastore = require('@google-cloud/datastore');
-const cacheManager = require('cache-manager');
 const chai = require('chai');
 const sinon = require('sinon');
 const requireUncached = require('require-uncached');
@@ -214,19 +213,16 @@ describe('e2e (Datastore & Redis cache)', () => {
             this.skip();
         }
 
-        const memoryCache = cacheManager.caching({ store: 'memory' });
-        const redisCache = cacheManager.caching({ store: redisStore });
-        redisClient = redisCache.store.getClient();
-
         cache = gstoreCache.init({
             config: {
-                stores: [memoryCache, redisCache],
+                stores: [{ store: 'memory' }, { store: redisStore }],
             },
             datastore: ds,
         });
         const onReady = () => {
             const prefix = cache.config.cachePrefix.queries;
             queryToString = q => prefix + datastore.dsQueryToString(q);
+            redisClient = cache.config.stores[1].store.getClient();
             done();
         };
         cache.on('ready', onReady);

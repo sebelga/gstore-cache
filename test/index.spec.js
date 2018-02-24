@@ -5,6 +5,7 @@
 const chai = require('chai');
 const sinon = require('sinon');
 const ds = require('@google-cloud/datastore')();
+const nodeCacheManager = require('cache-manager');
 
 const gstoreCache = require('../lib');
 const StoreMock = require('./mocks/cache-store');
@@ -90,12 +91,11 @@ describe('gsCache', () => {
         });
 
         it('should detect redis client (multi store)', done => {
-            const memoryCache = StoreMock();
-            const redisCache = StoreMock('redis');
+            sinon.stub(nodeCacheManager, 'caching').callsFake(store => StoreMock(store));
 
             gsCache = gstoreCache.init({
                 config: {
-                    stores: [memoryCache, redisCache],
+                    stores: ['memory', 'redis'],
                     ttl: {
                         keys: 30,
                         queries: 30,
@@ -106,6 +106,7 @@ describe('gsCache', () => {
             const onReady = () => {
                 assert.isDefined(gsCache.redisClient);
                 gsCache.removeListener('ready', onReady);
+                nodeCacheManager.caching.restore();
                 done();
             };
 
