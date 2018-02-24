@@ -33,13 +33,23 @@ const cleanUp = cb => {
 // -------------------- Test Data ---------------------
 const k1 = ds.key(['Parent', 'default', 'User', 222]);
 const k2 = ds.key(['Parent', 'default', 'User', 333]);
+const k3 = ds.key(['Blog', 'default', 'Post', 111]);
+const k4 = ds.key(['Blog', 'default', 'Post', 222]);
 const user1 = { name: 'john', age: 20 };
 const user2 = { name: 'mick', age: 20 };
+const post1 = { title: 'Hello', category: 'tech' };
+const post2 = { title: 'World', category: 'tech' };
 
 const query = ds
     .createQuery('User')
     .filter('age', 20)
     .hasAncestor(ds.key(['Parent', 'default']));
+
+const query2 = ds
+    .createQuery('Post')
+    .filter('category', 'tech')
+    .hasAncestor(ds.key(['Blog', 'default']));
+
 // ----------------------------------------------------
 
 describe('e2e (Datastore & Memory cache)', () => {
@@ -152,7 +162,10 @@ describe('e2e (Datastore & Memory cache)', () => {
                 // Skip e2e tests suite
                 this.skip();
             }
-            ds.save([{ key: k1, data: user1 }, { key: k2, data: user2 }]).then(() => done());
+            Promise.all([
+                ds.save([{ key: k1, data: user1 }, { key: k2, data: user2 }]),
+                ds.save([{ key: k3, data: post1 }, { key: k4, data: post2 }]),
+            ]).then(() => done());
         });
 
         describe('set()', () => {
@@ -168,6 +181,24 @@ describe('e2e (Datastore & Memory cache)', () => {
                             expect(entities).deep.equal([user1, user2]);
                         });
                 }));
+        });
+
+        describe('mget() & mset()', () => {
+            it('should set and return multiple queries', () => {
+                cache.queries.mget(query, query2).then(result1 => {
+                    assert.isUndefined(result1[0]);
+                    assert.isUndefined(result1[1]);
+                    return Promise.all([query.run(), query2.run()])
+                        .then(result2 => cache.queries.mset(query, result2[0], query2, result2[1]))
+                        .then(() => cache.queries.mget(query, query2))
+                        .then(result3 => {
+                            const [users] = result3[0];
+                            const [posts] = result3[1];
+                            expect(users).deep.equal([user1, user2]);
+                            expect(posts).deep.equal([post1, post2]);
+                        });
+                });
+            });
         });
     });
 });
