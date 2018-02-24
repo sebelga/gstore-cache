@@ -68,7 +68,7 @@ cache.keys.wrap([key1, key2, key3]).then(entities => {
 });
 ```
 
-The "**gstoreInstance.keys.wrap()**" helper above is syntactic sugar for the following:
+The "gstoreInstance.keys.**wrap()**" helper above is syntactic sugar for the following:
 
 ```js
 const Datastore = require('@google-cloud/datastore');
@@ -133,7 +133,7 @@ cache.queries.wrap(query).then(response => {
 });
 ```
 
-The "**gstoreInstance.queries.wrap()**" helper is syntactic sugar for the following:
+The "gstoreInstance.queries.**wrap()**" helper is syntactic sugar for the following:
 
 ```js
 const Datastore = require('@google-cloud/datastore');
@@ -170,6 +170,66 @@ cache.queries
     });
 ```
 
+### Advanced Queries Caching
+
+gstore cache has an advanced cache mechanism for the queries when you provide a Redis client.  
+If you provide a redis store **and** you set the ttl for the queries to **0** then when you wrap() or set() a query in the cache, its Entity Kind will be detected and the cache _key_ will be added to a _Set_ in Redis for the corresponding Entity Kind. This means that you can safely have the query response in the cache infinitely until you either add, edit or delete an entity of the same _Kind_.
+
+```js
+const Datastore = require('@google-cloud/datastore');
+const gstoreCache = require('gstore-cache');
+const redisStore = require('cache-manager-redis-store');
+
+const datastore = new Datastore();
+
+const cache = gstoreCache.init({
+    datastore,
+    config: {
+        stores: [{ store: redisStore }],
+        ttl: {
+            keys: 600,
+            queries: 0, // important
+        },
+    },
+});
+
+// ...in some handler
+
+const query = datastore
+    .createQuery('Post')
+    .limit(10);
+
+// with wrap()
+cache.queries.wrap(query)
+    .then((response) => {
+        ...
+    });
+
+// or with set()
+query.run()
+    .then((response) => {
+        cache.queries.set(query, response)
+            .then(...);
+    });
+
+// The query has an infinite TTL. You invalidate the cache  only when
+// you create/edit or delete a "Posts" entity.
+
+const key = datastore.key(['Posts']);
+const data = { title: 'My Post' };
+
+datastore.save({ key, data })
+    .then(() => {
+        // invalidate all the queries for "Posts" Entity Kind
+        cache.queries.cleanQueriesEntityKind(['Posts'])
+            .then(() => {
+                // No more cache for Posts queries
+            });
+    });
+```
+
+---
+
 ## API
 
 ### gstoreCache
@@ -188,6 +248,24 @@ The **config** object has the following properties:
 * _stores_: An array of "cache-manager" stores. Each store is an object that will be passed to the `cacheManager.caching()` method. [Read the docs](https://github.com/BryanDonovan/node-cache-manager) to learn more about _node cache manager_.  
   **Important:** Since version 2.7.0 "cache-manager" allows you to set, get and delete **multiple keys** (with mset, mget and del). The store(s) you provide here must support this feature.  
   At the time of this writting only the "memory" store and the "[node-cache-manager-redis-store](https://github.com/dabroek/node-cache-manager-redis-store)" support it. If you provide a store that does not support mset/mget you can still use gstore-cache but you won't be able to set or retrieve multiple keys/queries at once.
+
+```js
+// Multi stores example
+
+const Datastore = require('@google-cloud/datastore');
+const gstoreCache = require('gstore-cache');
+const redisStore = require('cache-manager-redis-store');
+
+const datastore = new Datastore();
+
+gstoreCache.init({
+    datastore,
+    config: {
+        stores: [{ store: 'memory', max: 100 }, { store: redisStore }],
+    },
+});
+```
+
 * _ttl_: An object of TTL configuration for Keys and Queries. This is where you define the TTL (Time To Live) in seconds for the **Key** caching and **Query** caching.
 
 ```js
