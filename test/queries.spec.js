@@ -691,13 +691,11 @@ describe('gstoreCache.queries', () => {
 
         it('should bubbble up error', () => {
             const error = new Error('Houston we got a problem');
-            const mock = {
-                exec: cb => cb(error),
-            };
-            redisClient.multi = () => mock;
+            sinon.stub(redisClient, 'multi').callsFake(() => ({ exec: cb => cb(error) }));
 
             return gsCache.queries.cacheQueryEntityKind().catch(err => {
                 expect(err).equal(error);
+                redisClient.multi.restore();
             });
         });
     });
@@ -730,49 +728,49 @@ describe('gstoreCache.queries', () => {
         });
 
         it('should remove all queries keys from entityKind Set and their cache', () => {
-            sinon.stub(redisClient, 'smembers').callsFake((key, cb) => {
-                cb(null, ['abc', 'def']);
-            });
+            sinon.stub(redisClient, 'multi').callsFake(() => ({
+                exec: cb => cb(null, [['abc', 'def']]),
+            }));
             sinon.stub(redisClient, 'del').callsFake((keys, cb) => cb(null, 7));
 
             return gsCache.queries.cleanQueriesEntityKind('User').then(res => {
-                assert.ok(redisClient.smembers.called);
+                assert.ok(redisClient.multi.called);
                 assert.ok(redisClient.del.called);
-                const { args: argsSmembers } = redisClient.smembers.getCall(0);
+                const { args: argsMulti } = redisClient.multi.getCall(0);
                 const { args: argsDel } = redisClient.del.getCall(0);
 
                 const setQueries = `${prefix}User`;
-                expect(argsSmembers[0]).equal(setQueries);
+                expect(argsMulti[0][0]).deep.equal(['smembers', setQueries]);
                 expect(argsDel[0]).include.members(['abc', 'def', setQueries]);
                 expect(res).equal(7);
 
-                redisClient.smembers.restore();
+                redisClient.multi.restore();
                 redisClient.del.restore();
             });
         });
 
         it('should bubble up errors from "smembers" call', done => {
             const error = new Error('Houston we really got a problem');
-            sinon.stub(redisClient, 'smembers').callsFake((key, cb) => {
-                cb(error);
-            });
+            sinon.stub(redisClient, 'multi').callsFake(() => ({ exec: cb => cb(error) }));
 
             gsCache.queries.cleanQueriesEntityKind('User').catch(err => {
                 expect(err).equal(error);
 
-                redisClient.smembers.restore();
+                redisClient.multi.restore();
                 done();
             });
         });
 
         it('should bubble up errors from "del" call', done => {
             const error = new Error('Houston we really got a problem');
+            sinon.stub(redisClient, 'multi').returns({ exec: cb => cb(null, []) });
             sinon.stub(redisClient, 'del').callsFake((key, cb) => {
                 cb(error);
             });
 
             gsCache.queries.cleanQueriesEntityKind('User').catch(err => {
                 expect(err).equal(error);
+                redisClient.del.restore();
                 done();
             });
         });
