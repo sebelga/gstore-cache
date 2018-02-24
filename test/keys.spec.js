@@ -128,7 +128,43 @@ describe('gstoreCache.keys', () => {
 
                 return cacheManager.get(keyToString(key3)).then(cacheResponse => {
                     expect(cacheResponse.name).equal('Carol');
+                    ds.get.restore();
                 });
+            });
+        });
+
+        it('should maintain the order of the keys passed (1)', () => {
+            sinon.stub(ds, 'get').resolves([entity2, entity1]);
+
+            return gsCache.keys.wrap([key1, key2]).then(result => {
+                expect(result[0].name).equal('John');
+                expect(result[1].name).equal('Mick');
+
+                return cacheManager.mget(keyToString(key1), keyToString(key2)).then(cacheResponse => {
+                    expect(cacheResponse[0].name).equal('John');
+                    expect(cacheResponse[1].name).equal('Mick');
+                    ds.get.restore();
+                });
+            });
+        });
+
+        it('should maintain the order of the keys passed (2)', () => {
+            cacheManager.set(keyToString(key1), entity1);
+            sinon.stub(ds, 'get').resolves([entity3, entity2]);
+
+            return gsCache.keys.wrap([key1, key2, key3]).then(result => {
+                expect(result[0].name).equal('John');
+                expect(result[1].name).equal('Mick');
+                expect(result[2].name).equal('Carol');
+
+                return cacheManager
+                    .mget(keyToString(key1), keyToString(key2), keyToString(key3))
+                    .then(cacheResponse => {
+                        expect(cacheResponse[0].name).equal('John');
+                        expect(cacheResponse[1].name).equal('Mick');
+                        expect(cacheResponse[2].name).equal('Carol');
+                        ds.get.restore();
+                    });
             });
         });
 
@@ -148,7 +184,7 @@ describe('gstoreCache.keys', () => {
             // When not all keys in cache
             cacheManager.set(keyToString(key1), entity1);
             sinon.spy(gsCache.cacheManager, 'mset');
-            sinon.stub(methods, 'fetchHandler').resolves(entity1);
+            sinon.stub(methods, 'fetchHandler').resolves(entity2);
 
             return gsCache.keys.wrap([key1, key2], methods.fetchHandler).then(() => {
                 assert.ok(gsCache.cacheManager.mset.called);
