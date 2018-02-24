@@ -10,9 +10,12 @@ https://raw.githubusercontent.com/dbader/readme-template/master/README.md
 [![Build Status][travis-image]][travis-url]
 [![coveralls-image]][coveralls-url]
 
-Advanced cache layer for Google Datastore Datastore Entities Keys and Queries. Define multiple cache stores thanks to [node-cache-manager](https://github.com/BryanDonovan/node-cache-manager) that gstore-cache uses underneath. You get out of the box a LRU memory cache to speed up your application right away!
+gstore cache helps you speed up your Datastore entities fetching by providing an advanced cache layer on top of @google-cloud/datastore:
 
-Advanced cache (with [node Redis](https://github.com/NodeRedis/node_redis)) will automatically save your Queries by **Entity Kind**. You can then set an infinite ttl (time to live) for your queries and only invalidate the cache when you _edit_ or _delete_ an entity Kind.
+* Define multiple cache stores with different ttl thanks to [node-cache-manager](https://github.com/BryanDonovan/node-cache-manager).
+* LRU memory cache out of the box to speed up your application right away!
+* Datastore Key and Query objects are converted to unique string ids easy to cache
+* Advanced cache (with [node Redis](https://github.com/NodeRedis/node_redis)) will automatically save your Queries by **Entity Kind**. You can then set an infinite ttl (time to live) for your queries and only invalidate the cache when you _edit_ or _delete_ an entity Kind.
 
 ## Installation
 
@@ -26,66 +29,76 @@ yarn add gstore-cache
 
 ```js
 const Datastore = require('@google-cloud/datastore');
-const GstoreCache = require('gstore-cache');
+const gstoreCache = require('gstore-cache');
 
 const datastore = new Datastore();
-const cache = GstoreCache(); // default config (see below)
+const cache = gstoreCache.init({ datastore });
 
+const key = datastore.key(['Company', 'Google']);
+
+/**
+ * The "keys.wrap()" helper will
+ * - Look for the entity in the cache
+ * - If not found, fetch it from the Datastore
+ * - Prime the cache with the entity fetched from the Datastore.
+ */
+cache.keys.wrap(key).then(entity => {
+    console.log(entity);
+    console.log(entity[datastore.KEY]); // the Key Symbol is added from cache results
+});
+
+/**
+ * You can also pass several keys.
+ * gstore-cache will first check the cache and only fetch from the Datastore
+ * the keys *not* found.
+ *
+ * In the example below, only the "key3" would be passed to datastore.get() and
+ * fetched from the Datastore
+ */
+const key1 = datastore.key(['Task', 123]); // this entity is in cache
+const key2 = datastore.key(['Task', 456]); // this entity is in cache
+const key3 = datastore.key(['Task', 789]);
+
+cache.keys.wrap([key1, key2, key3]).then(entities => {
+    console.log(entities[0]);
+    console.log(entities[1]);
+    console.log(entities[2]);
+});
+```
+
+The "wrap" helper above is just syntactic sugar for the following
+
+```js
+const Datastore = require('@google-cloud/datastore');
+const gstoreCache = require('gstore-cache');
+
+// After you initialized the cache (once on app launch), this is how you get its instance
+const cache = gstoreCache.instance();
+
+const datastore = new Datastore();
 const key = datastore.key(['Company', 'Google']);
 
 cache.keys
     .get(key)
     .then(cacheEntity => {
         if (cacheEntity) {
-            // Cache found, no need to go any further
-            return [cacheEntity]; // wrap in an Array to align with google-cloud response
+            // Cache found... great!
+            return cacheEntity;
         }
 
         // Fetch from the Datastore
         return datastore.get(key).then(response => {
-            // prime the cache. The Datastore Key object will be converted
-            // to a unique *string* key
-            return cache.keys.set(key, response[0]).then(() => response);
+            const entity = response[0];
+
+            // Prime the cache.
+            // The Datastore Key object will be converted to a unique
+            // string key in the cache.
+            return cache.keys.set(key, entity);
         });
     })
-    .then(response => {
-        console.log(response[0]);
+    .then(entity => {
+        console.log(entity);
     });
-```
-
-The above code could be simplified with the "wrap" helper.
-
-```js
-const Datastore = require('@google-cloud/datastore');
-const GstoreCache = require('gstore-cache');
-
-const ds = new Datastore();
-const cache = GstoreCache();
-
-const key = datastore.key(['Company', 'Google']);
-
-/**
- * "datastore.get" is the Handler to fetch the key(s) if they are not found
- */
-cache.wrap(key, datastore.get).then(response => {
-    console.log(response[0]);
-});
-
-/**
- * If we pass several keys, gstore-cache will first search for them in the cache.
- * If not all the keys are found, *only* the ones missing will be passed to the fetch Handler
- * In the following example, only the "key3" would be passed to datastore.get() method
- */
-const key1 = datastore.key(['Task', 123]); // in cache
-const key2 = datastore.key(['Task', 456]); // in cache
-const key3 = datastore.key(['Task', 789]);
-
-cache.keys.wrap([key1, key2, key3], datastore.get).then(response => {
-    const entities = response[0];
-    console.log(entities[0]);
-    console.log(entities[1]);
-    console.log(entities[2]);
-});
 ```
 
 ## Development setup
@@ -104,6 +117,22 @@ npm run coverage
 npm run prettier
 ```
 
+To run the e2e test you need to launch the Local Datastore emulator and a local Redis server.
+
+```sh
+# Local Datastore
+# Make sure you have the emulator installed
+# More info: https://cloud.google.com/datastore/docs/tools/datastore-emulator
+#
+# The following command will create a "local-datastore" folder inside the project
+# where the Local Datastore will keep the entities
+gcloud beta emulators datastore start --data-dir=$PWD/local-datastore
+
+# Redis server (Mac Os or Linux)
+# From inside the folder where redis is located:
+./redis-server
+```
+
 ## Release History
 
 * 0.1.0
@@ -111,11 +140,12 @@ npm run prettier
 
 ## Meta
 
-Sébastien Loix – [@sebelga](https://twitter.com/sebelga) – sebastien@loix.me
+Sébastien Loix – [@sebloix](https://twitter.com/sebloix) – sebastien@loix.me
 
 Distributed under the MIT license. See `LICENSE` for more information.
 
-[https://github.com/sebelga](https://github.com/sebelga/)
+[https://github.com/sebelga](https://github.com/sebelga/)  
+[http://s.loix.me](http://s.loix.me)
 
 ## Contributing
 

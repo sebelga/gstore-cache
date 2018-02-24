@@ -4,9 +4,10 @@ const ds = require('@google-cloud/datastore')();
 const chai = require('chai');
 const sinon = require('sinon');
 
-const GstoreCache = require('../lib');
+const gstoreCache = require('../lib');
 const { datastore, string } = require('../lib/utils');
 const { keys, entities } = require('./mocks/datastore');
+const StoreMock = require('./mocks/cache-store');
 
 const { expect, assert } = chai;
 
@@ -19,17 +20,22 @@ describe('gstoreCache.keys', () => {
     const [entity1, entity2, entity3] = entities;
 
     const methods = {
-        fetchHandler() {},
+        fetchHandler() {
+            return Promise.resolve();
+        },
     };
 
     beforeEach(done => {
-        gsCache = GstoreCache(true);
+        gsCache = gstoreCache.init({ datastore: ds });
 
-        gsCache.on('ready', () => {
+        const onReady = () => {
             keyToString = key => gsCache.config.cachePrefix.keys + datastore.dsKeyToString(key);
             ({ cacheManager } = gsCache);
+            gsCache.removeListener('ready', onReady);
             done();
-        });
+        };
+
+        gsCache.on('ready', onReady);
     });
 
     afterEach(() => {
@@ -85,6 +91,20 @@ describe('gstoreCache.keys', () => {
             });
         });
 
+        it('should *not* get entity from cache (3)', () => {
+            // When ttl is set to "-1" don't cache
+
+            cacheManager.set(keyToString(key1), entity1);
+            sinon.spy(methods, 'fetchHandler');
+            const copyConfig = gsCache.config.ttl;
+            gsCache.config.ttl = Object.assign({}, gsCache.config.ttl, { keys: -1 });
+
+            return gsCache.keys.wrap(key1, methods.fetchHandler).then(() => {
+                expect(methods.fetchHandler.called).equal(true);
+                gsCache.config.ttl = copyConfig;
+            });
+        });
+
         it('should get entity from fetchHandler', () => {
             sinon.stub(methods, 'fetchHandler').resolves(entity3);
 
@@ -96,6 +116,93 @@ describe('gstoreCache.keys', () => {
                     expect(cacheResponse.name).equal('Carol');
                 });
             });
+        });
+
+        it('should get entity from *default* fetchHandler', () => {
+            sinon.stub(ds, 'get').resolves(entity3);
+
+            return gsCache.keys.wrap(key3, { cache: true }).then(result => {
+                expect(ds.get.called).equal(true);
+                expect(result.name).equal('Carol');
+
+                return cacheManager.get(keyToString(key3)).then(cacheResponse => {
+                    expect(cacheResponse.name).equal('Carol');
+                });
+            });
+        });
+
+        it('should set the TTL from config (1)', () => {
+            sinon.spy(gsCache.cacheManager, 'mset');
+            sinon.stub(methods, 'fetchHandler').resolves(entity1);
+
+            return gsCache.keys.wrap(key1, methods.fetchHandler).then(() => {
+                assert.ok(gsCache.cacheManager.mset.called);
+                const { args } = gsCache.cacheManager.mset.getCall(0);
+                expect(args[2].ttl).equal(600);
+                gsCache.cacheManager.mset.restore();
+            });
+        });
+
+        it('should set the TTL from config (2)', () => {
+            // When not all keys in cache
+            cacheManager.set(keyToString(key1), entity1);
+            sinon.spy(gsCache.cacheManager, 'mset');
+            sinon.stub(methods, 'fetchHandler').resolves(entity1);
+
+            return gsCache.keys.wrap([key1, key2], methods.fetchHandler).then(() => {
+                assert.ok(gsCache.cacheManager.mset.called);
+                const { args } = gsCache.cacheManager.mset.getCall(0);
+                expect(args[2].ttl).equal(600);
+                gsCache.cacheManager.mset.restore();
+            });
+        });
+
+        it('should set ttl dynamically when multistore', done => {
+            const memoryCache = StoreMock();
+            const redisCache = StoreMock('redis');
+
+            gsCache = gstoreCache.init({
+                config: {
+                    stores: [memoryCache, redisCache],
+                    ttl: {
+                        stores: {
+                            memory: {
+                                keys: 1357,
+                            },
+                            redis: {
+                                keys: 2468,
+                            },
+                        },
+                    },
+                },
+            });
+
+            const onReady = () => {
+                gsCache.removeAllListeners();
+
+                sinon.spy(gsCache.cacheManager, 'mset');
+                sinon.spy(memoryCache.store, 'set');
+                sinon.spy(redisCache.store, 'set');
+                sinon.stub(methods, 'fetchHandler').resolves(entity1);
+
+                return gsCache.keys.wrap(key1, methods.fetchHandler).then(() => {
+                    const options = gsCache.cacheManager.mset.getCall(0).args[2];
+                    const optMemory = memoryCache.store.set.getCall(0).args[2];
+                    const optRedis = redisCache.store.set.getCall(0).args[2];
+
+                    expect(typeof options.ttl).equal('function');
+                    expect(optMemory.ttl).equal(1357);
+                    expect(optRedis.ttl).equal(2468);
+
+                    gsCache.deleteCacheManager(() => {
+                        memoryCache.store.set.restore();
+                        redisCache.store.set.restore();
+                        done();
+                    });
+                });
+            };
+
+            gsCache.on('ready', onReady);
         });
 
         it('should prime the cache after fetch', () => {
@@ -166,12 +273,17 @@ describe('gstoreCache.keys', () => {
     describe('get()', () => {
         it('should get key from cache', () => {
             const value = { name: 'john' };
-            return gsCache.keys.set(key1, value).then(() => {
+            return gsCache.keys.set(key1, value).then(() =>
                 gsCache.keys.get(key1).then(res => {
-                    expect(res).equal(value);
-                });
-            });
+                    expect(res).deep.equal(value);
+                })
+            );
         });
+
+        it('should return undefined if no entity found', () =>
+            gsCache.keys.get(key1).then(res => {
+                expect(typeof res).equal('undefined');
+            }));
 
         it('should add KEY Symbol to response from cache', () => {
             const value = { name: 'john' };
@@ -209,14 +321,68 @@ describe('gstoreCache.keys', () => {
                 expect(result.name).equal('john');
             });
         });
+
+        it('should set the TTL from config', () => {
+            sinon.spy(gsCache, 'set');
+            return gsCache.keys.set(key1, entity1).then(() => {
+                const { args } = gsCache.set.getCall(0);
+                expect(args[2].ttl).equal(600);
+            });
+        });
+
+        it('should set ttl dynamically when multistore', done => {
+            const memoryCache = StoreMock();
+            const redisCache = StoreMock('redis');
+
+            gsCache = gstoreCache.init({
+                config: {
+                    stores: [memoryCache, redisCache],
+                    ttl: {
+                        stores: {
+                            memory: {
+                                keys: 1357,
+                            },
+                            redis: {
+                                keys: 2468,
+                            },
+                        },
+                    },
+                },
+            });
+
+            const onReady = () => {
+                gsCache.removeAllListeners();
+
+                sinon.spy(gsCache, 'set');
+                sinon.spy(memoryCache.store, 'set');
+                sinon.spy(redisCache.store, 'set');
+                sinon.stub(methods, 'fetchHandler').resolves(entity1);
+
+                return gsCache.keys.set(key1, entity1).then(() => {
+                    const options = gsCache.set.getCall(0).args[2];
+                    const optMemory = memoryCache.store.set.getCall(0).args[2];
+                    const optRedis = redisCache.store.set.getCall(0).args[2];
+
+                    expect(typeof options.ttl).equal('function');
+                    expect(optMemory.ttl).equal(1357);
+                    expect(optRedis.ttl).equal(2468);
+
+                    memoryCache.store.set.restore();
+                    redisCache.store.set.restore();
+                    done();
+                });
+            };
+
+            gsCache.on('ready', onReady);
+        });
     });
 
     describe('mset()', () => {
         it('should add multiple keys to cache', () => {
             const value1 = { name: 'john' };
             const value2 = { name: 'mick' };
-
             sinon.spy(gsCache, 'mset');
+
             return gsCache.keys.mset(key1, value1, key2, value2).then(result => {
                 assert.ok(gsCache.mset.called);
                 const { args } = gsCache.mset.getCall(0);
@@ -225,6 +391,15 @@ describe('gstoreCache.keys', () => {
                 expect(args[2]).equal(keyToString(key2));
                 expect(args[3]).equal(value2);
                 expect(result).include.members([value1, value2]);
+            });
+        });
+
+        it('should set the TTL from config', () => {
+            sinon.spy(gsCache, 'mset');
+
+            return gsCache.keys.mset(key1, {}, key2, {}).then(() => {
+                const { args } = gsCache.mset.getCall(0);
+                expect(args[4].ttl).equal(600);
             });
         });
     });
