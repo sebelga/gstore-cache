@@ -645,9 +645,9 @@ datastore.save({ key, data })
 
 ---
 
-### "cache-manager" methods bindings (get, mget, set, mset, del)
+### "cache-manager" methods bindings (get, mget, set, mset, del, reset)
 
-gstore cache has bindings set to the underlying "cache-manager" methods _get_, _mget_, _set_, _mset_ and _del_. This allows you to cache any other data you need. Refer the the cache-manager documentation.
+gstore cache has bindings set to the underlying "cache-manager" methods _get_, _mget_, _set_, _mset_, _del_ and _reset_. This allows you to cache any other data you need. Refer the the cache-manager documentation.
 
 ```js
 const gstoreCache = require('gstore-cache');
@@ -664,6 +664,9 @@ cache.mget('my-key1', 'my-key2').then((data) => {
 });
 
 cache.del(['my-key1', 'my-key2']).then(() => ...);
+
+// Clears the cache
+cache.reset().then(() => ...);
 ```
 
 ## Development setup

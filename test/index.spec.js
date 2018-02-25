@@ -190,7 +190,7 @@ describe('gsCache', () => {
         });
     });
 
-    describe('get|mget|set|mset|del', () => {
+    describe('get|mget|set|mset|del|reset', () => {
         it('should bind to cache-manager methods', () => {
             gsCache = gstoreCache.init();
             const { cacheManager } = gsCache;
@@ -200,6 +200,7 @@ describe('gsCache', () => {
             expect(gsCache.set).equal(cacheManager.set);
             expect(gsCache.mset).equal(cacheManager.mset);
             expect(gsCache.del).equal(cacheManager.del);
+            expect(gsCache.reset).equal(cacheManager.reset);
         });
     });
 });

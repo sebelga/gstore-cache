@@ -119,6 +119,22 @@ describe('gstoreCache.keys', () => {
             });
         });
 
+        it('should get entity from fetchHandler (2)', () => {
+            sinon.stub(methods, 'fetchHandler').resolves([entity1, entity2]);
+
+            return gsCache.keys.wrap([key1, key2], methods.fetchHandler).then(result => {
+                expect(methods.fetchHandler.called).equal(true);
+                expect(methods.fetchHandler.getCall(0).args[0].length).equal(2);
+                expect(result[0].name).equal('John');
+                expect(result[1].name).equal('Mick');
+
+                return cacheManager.mget(keyToString(key1), keyToString(key2)).then(cacheResponse => {
+                    expect(cacheResponse[0].name).equal('John');
+                    expect(cacheResponse[1].name).equal('Mick');
+                });
+            });
+        });
+
         it('should get entity from *default* fetchHandler', () => {
             sinon.stub(ds, 'get').resolves(entity3);
 
