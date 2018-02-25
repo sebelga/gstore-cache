@@ -355,11 +355,24 @@ Get the gstore cache instance.
 
 ### gstoreCacheInstance.keys
 
-#### `wrap(key|Array<key> [, fetchHandler]])`
+#### `wrap(key|Array<key> [options, fetchHandler]])`
 
 wrap is a helper that will: check the cache, if no entity(ies) are found in the cache, it will fetch the entity(ies) in the Datastore. Finally it will prime the cache with the entity(ies).
 
 * _key_: a Datastore Key or an Array of Datastore Keys. If it is an array of keys, only the keys that are **not found in the cache** will be passed to the fetchHandler.
+
+* _options_: an optional object of options.
+
+```js
+{
+    ttl: 900, // custom TTL value for this wrap
+}
+
+// For multi-stores it can also be an object
+{
+    ttl: {  memory: 300, redis: 3600 }
+}
+```
 
 * _fetchHandler_: an optional function handler to fetch the keys. If it is not provided it will default to the `datastore.get()` method.
 
@@ -385,7 +398,7 @@ cache.keys.wrap(key)
 const fetchHandler = (key) => (
     datastore.get(key)
         .then((company) => {
-            // Let's add the latest publication of the company.
+            // Let's add the latest Posts of the company.
             // We'll have to be careful not to forget to delete this cache
             // when creating new Posts.
             const query = datastore.createQuery('Posts')
@@ -401,6 +414,12 @@ const fetchHandler = (key) => (
 );
 
 cache.keys.wrap(key, fetchHandler)
+    .then((entity) => {
+        console.log(entity);
+    });
+
+// or with a custom TTL
+cache.keys.wrap(key, { ttl: 900 }, fetchHandler)
     .then((entity) => {
         console.log(entity);
     });

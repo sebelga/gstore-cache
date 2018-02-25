@@ -22,7 +22,7 @@ const key3 = ds.key(['User', 789]);
 const allKeys = [key1, key2, key3];
 
 const data1 = { name: 'John Snow' };
-// const data2 = { name: 'Mick Jagger' };
+const data2 = { name: 'Mick Jagger' };
 // const data3 = { name: 'Keith Richards' };
 
 const cleanUp = cb => {
@@ -143,6 +143,25 @@ describe('e2e (Datastore & Memory cache)', () => {
                             cache.keys.wrap(key1).then(result => {
                                 expect(result).deep.equal(data1);
                                 expect(result[ds.KEY]).equal(key1);
+                                expect(ds.get.callCount).equal(1);
+                            })
+                        )
+                ));
+
+            it('should allow multiple keys', () =>
+                ds.save([{ key: key1, data: data1 }, { key: key2, data: data2 }]).then(() =>
+                    cache.keys
+                        .wrap([key1, key2])
+                        .then(result => {
+                            expect(result[0]).deep.equal(data1);
+                            expect(result[1]).deep.equal(data2);
+                        })
+                        .then(() =>
+                            cache.keys.wrap([key1, key2]).then(result => {
+                                expect(result[0]).deep.equal(data1);
+                                expect(result[1]).deep.equal(data2);
+                                expect(result[0][ds.KEY]).equal(key1);
+                                expect(result[1][ds.KEY]).equal(key2);
                                 expect(ds.get.callCount).equal(1);
                             })
                         )

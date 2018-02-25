@@ -46,5 +46,12 @@ module.exports = (name = 'memory') => ({
             }
             return Promise.resolve();
         },
+        del: (...args) => {
+            const cb = getCallback(...args);
+            if (typeof cb === 'function') {
+                return cb();
+            }
+            return Promise.resolve();
+        },
     },
 });

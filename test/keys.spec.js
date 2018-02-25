@@ -73,41 +73,8 @@ describe('gstoreCache.keys', () => {
             });
         });
 
-        it('should *not* get entity from cache (1)', () => {
-            sinon.stub(methods, 'fetchHandler').resolves([]);
-            gsCache.config.global = false;
-            cacheManager.set(keyToString(key1), entity1);
-
-            return gsCache.keys.wrap(key1, methods.fetchHandler).then(() => {
-                expect(methods.fetchHandler.called).equal(true);
-            });
-        });
-
-        it('should *not* get entity from cache (2)', () => {
-            sinon.stub(methods, 'fetchHandler').resolves([]);
-            cacheManager.set(keyToString(key1), entity1);
-
-            return gsCache.keys.wrap(key1, { cache: false }, methods.fetchHandler).then(() => {
-                expect(methods.fetchHandler.called).equal(true);
-            });
-        });
-
-        it('should *not* get entity from cache (3)', () => {
-            // When ttl is set to "-1" don't cache
-
-            cacheManager.set(keyToString(key1), entity1);
-            sinon.spy(methods, 'fetchHandler');
-            const copyConfig = gsCache.config.ttl;
-            gsCache.config.ttl = Object.assign({}, gsCache.config.ttl, { keys: -1 });
-
-            return gsCache.keys.wrap(key1, methods.fetchHandler).then(() => {
-                expect(methods.fetchHandler.called).equal(true);
-                gsCache.config.ttl = copyConfig;
-            });
-        });
-
         it('should get entity from fetchHandler', () => {
-            sinon.stub(methods, 'fetchHandler').resolves(entity3);
+            sinon.stub(methods, 'fetchHandler').resolves([entity3]);
 
             return gsCache.keys.wrap(key3, methods.fetchHandler).then(result => {
                 expect(methods.fetchHandler.called).equal(true);
@@ -120,7 +87,7 @@ describe('gstoreCache.keys', () => {
         });
 
         it('should get entity from fetchHandler (2)', () => {
-            sinon.stub(methods, 'fetchHandler').resolves([entity1, entity2]);
+            sinon.stub(methods, 'fetchHandler').resolves([[entity1, entity2]]);
 
             return gsCache.keys.wrap([key1, key2], methods.fetchHandler).then(result => {
                 expect(methods.fetchHandler.called).equal(true);
@@ -136,7 +103,7 @@ describe('gstoreCache.keys', () => {
         });
 
         it('should get entity from *default* fetchHandler', () => {
-            sinon.stub(ds, 'get').resolves(entity3);
+            sinon.stub(ds, 'get').resolves([entity3]);
 
             return gsCache.keys.wrap(key3, { cache: true }).then(result => {
                 expect(ds.get.called).equal(true);
@@ -150,7 +117,7 @@ describe('gstoreCache.keys', () => {
         });
 
         it('should maintain the order of the keys passed (1)', () => {
-            sinon.stub(ds, 'get').resolves([entity2, entity1]);
+            sinon.stub(ds, 'get').resolves([[entity2, entity1]]);
 
             return gsCache.keys.wrap([key1, key2]).then(result => {
                 expect(result[0].name).equal('John');
@@ -166,7 +133,7 @@ describe('gstoreCache.keys', () => {
 
         it('should maintain the order of the keys passed (2)', () => {
             cacheManager.set(keyToString(key1), entity1);
-            sinon.stub(ds, 'get').resolves([entity3, entity2]);
+            sinon.stub(ds, 'get').resolves([[entity3, entity2]]);
 
             return gsCache.keys.wrap([key1, key2, key3]).then(result => {
                 expect(result[0].name).equal('John');
@@ -186,7 +153,7 @@ describe('gstoreCache.keys', () => {
 
         it('should set the TTL from config (1)', () => {
             sinon.spy(gsCache.cacheManager, 'mset');
-            sinon.stub(methods, 'fetchHandler').resolves(entity1);
+            sinon.stub(methods, 'fetchHandler').resolves([entity1]);
 
             return gsCache.keys.wrap(key1, methods.fetchHandler).then(() => {
                 assert.ok(gsCache.cacheManager.mset.called);
@@ -200,12 +167,24 @@ describe('gstoreCache.keys', () => {
             // When not all keys in cache
             cacheManager.set(keyToString(key1), entity1);
             sinon.spy(gsCache.cacheManager, 'mset');
-            sinon.stub(methods, 'fetchHandler').resolves(entity2);
+            sinon.stub(methods, 'fetchHandler').resolves([entity2]);
 
             return gsCache.keys.wrap([key1, key2], methods.fetchHandler).then(() => {
                 assert.ok(gsCache.cacheManager.mset.called);
                 const { args } = gsCache.cacheManager.mset.getCall(0);
                 expect(args[2].ttl).equal(600);
+                gsCache.cacheManager.mset.restore();
+            });
+        });
+
+        it('should set the TTL from options', () => {
+            sinon.spy(gsCache.cacheManager, 'mset');
+            sinon.stub(methods, 'fetchHandler').resolves([entity1]);
+
+            return gsCache.keys.wrap(key1, { ttl: 6543 }, methods.fetchHandler).then(() => {
+                assert.ok(gsCache.cacheManager.mset.called);
+                const { args } = gsCache.cacheManager.mset.getCall(0);
+                expect(args[2].ttl).equal(6543);
                 gsCache.cacheManager.mset.restore();
             });
         });
@@ -240,7 +219,7 @@ describe('gstoreCache.keys', () => {
                 sinon.spy(gsCache.cacheManager, 'mset');
                 sinon.spy(stores.memory.store, 'set');
                 sinon.spy(stores.redis.store, 'set');
-                sinon.stub(methods, 'fetchHandler').resolves(entity1);
+                sinon.stub(methods, 'fetchHandler').resolves([entity1]);
 
                 return gsCache.keys.wrap(key1, methods.fetchHandler).then(() => {
                     const options = gsCache.cacheManager.mset.getCall(0).args[2];
@@ -251,11 +230,21 @@ describe('gstoreCache.keys', () => {
                     expect(optMemory.ttl).equal(1357);
                     expect(optRedis.ttl).equal(2468);
 
-                    gsCache.deleteCacheManager(() => {
-                        stores.memory.store.set.restore();
-                        stores.redis.store.set.restore();
-                        nodeCacheManager.caching.restore();
-                        done();
+                    gsCache.keys.wrap(key1, { ttl: { memory: 555, redis: 777 } }, methods.fetchHandler).then(() => {
+                        const options2 = gsCache.cacheManager.mset.getCall(1).args[2];
+                        const optMemory2 = stores.memory.store.set.getCall(1).args[2];
+                        const optRedis2 = stores.redis.store.set.getCall(1).args[2];
+
+                        expect(typeof options2.ttl).equal('function');
+                        expect(optMemory2.ttl).equal(555);
+                        expect(optRedis2.ttl).equal(777);
+
+                        gsCache.deleteCacheManager(() => {
+                            stores.memory.store.set.restore();
+                            stores.redis.store.set.restore();
+                            nodeCacheManager.caching.restore();
+                            done();
+                        });
                     });
                 });
             };
@@ -264,7 +253,7 @@ describe('gstoreCache.keys', () => {
         });
 
         it('should prime the cache after fetch', () => {
-            sinon.stub(methods, 'fetchHandler').resolves([entity1, entity2]);
+            sinon.stub(methods, 'fetchHandler').resolves([[entity1, entity2]]);
 
             return gsCache.keys.wrap([key1, key2], methods.fetchHandler).then(() =>
                 cacheManager.mget(keyToString(key1), keyToString(key2)).then(results => {
@@ -278,7 +267,7 @@ describe('gstoreCache.keys', () => {
             cacheManager.set(keyToString(key1), entity1);
             cacheManager.set(keyToString(key2), entity2);
 
-            sinon.stub(methods, 'fetchHandler').resolves(entity3);
+            sinon.stub(methods, 'fetchHandler').resolves([entity3]);
 
             return gsCache.keys.wrap([key1, key2, key3], methods.fetchHandler).then(results => {
                 expect(methods.fetchHandler.called).equal(true);
@@ -418,7 +407,7 @@ describe('gstoreCache.keys', () => {
                 sinon.spy(gsCache, 'set');
                 sinon.spy(stores.memory.store, 'set');
                 sinon.spy(stores.redis.store, 'set');
-                sinon.stub(methods, 'fetchHandler').resolves(entity1);
+                sinon.stub(methods, 'fetchHandler').resolves([entity1]);
 
                 return gsCache.keys.set(key1, entity1).then(() => {
                     const options = gsCache.set.getCall(0).args[2];
