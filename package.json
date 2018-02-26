@@ -10,9 +10,9 @@
         "prettier": "prettier --write \"{lib,test}/**/*.js\"",
         "test": "mocha test --recursive --exit",
         "e2e-test": "DATASTORE_EMULATOR_HOST=localhost:8081 mocha test/e2e.spec.js --recursive --e2e",
-        "coverage": "istanbul cover ./node_modules/mocha/bin/_mocha -- -R spec --recursive",
+        "coverage": "istanbul cover ./node_modules/mocha/bin/_mocha -- -R spec --recursive --exit",
         "coveralls":
-            "istanbul cover _mocha --report lcovonly -- -R spec --recursive && cat ./coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js && rm -rf ./coverage"
+            "istanbul cover _mocha --report lcovonly -- -R spec --recursive --exit && cat ./coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js && rm -rf ./coverage"
     },
     "pre-commit": ["prettier"],
     "engines": {
