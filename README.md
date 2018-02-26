@@ -451,9 +451,22 @@ cache.keys.mget(key1, key2).then(entities => {
 });
 ```
 
-#### `set(key)`
+#### `set(key, entity, [, options])`
 
 Add an entity in the cache.
+
+* _options_: an optional object of options.
+
+```js
+{
+    ttl: 900, // custom TTL value for this wrap
+}
+
+// For multi-stores it can also be an object
+{
+    ttl: {  memory: 300, redis: 3600 }
+}
+```
 
 ```js
 const key = datastore.key(['Company', 'Google']);
@@ -465,9 +478,22 @@ datastore.get(key).then(response => {
 });
 ```
 
-#### `mset(key, value [, key2, value2, ...])`
+#### `mset(key, entity [, key(n), entity(n), options])`
 
 Add multiple entities in the cache.
+
+* _options_: an optional object of options.
+
+```js
+{
+    ttl: 900, // custom TTL value for this wrap
+}
+
+// For multi-stores it can also be an object
+{
+    ttl: {  memory: 300, redis: 3600 }
+}
+```
 
 ```js
 const key1 = datastore.key(['Company', 'Google']);
@@ -480,7 +506,7 @@ datastore.get([key1, key2]).then(response => {
     // the order of the returned entities. You will need to add some logic to order
     // the response or use the "wrap" helper above that does it for you.
 
-    cache.keys.mset(key1, entities[0], key2, entities[1]).then(() => ...);
+    cache.keys.mset(key1, entities[0], key2, entities[1], { ttl: 240 }).then(() => ...);
 });
 ```
 
@@ -493,6 +519,19 @@ datastore.get([key1, key2]).then(response => {
 wrap is a helper that will: check the cache, if the query is not found in the cache, it will run the query on the Datastore. Finally it will prime the cache with the response of the query.
 
 * _query_: a Datastore Query.
+
+* _options_: an optional object of options.
+
+```js
+{
+    ttl: 900, // custom TTL value for this wrap
+}
+
+// For multi-stores it can also be an object
+{
+    ttl: {  memory: 300, redis: 3600 }
+}
+```
 
 * _fetchHandler_: an optional function handler to fetch the query. If it is not provided it will default to the `query.run()` method.
 
@@ -518,8 +557,8 @@ cache.queries.wrap(query)
 /**
  * 2. Example with a custom fetch handler.
  */
-const fetchHandler = () => (
-    query.run()
+const fetchHandler = (q) => (
+    q.run()
         .then((response) => {
             const [entities] = response;
             // ... do anything with the entities
@@ -561,9 +600,22 @@ cache.queries.mget(query1, query2).then(response => {
 });
 ```
 
-#### `set(query, data)`
+#### `set(query, data [, options])`
 
 Add a query in the cache
+
+* _options_: an optional object of options.
+
+```js
+{
+    ttl: 900, // custom TTL value for this wrap
+}
+
+// For multi-stores it can also be an object
+{
+    ttl: {  memory: 300, redis: 3600 }
+}
+```
 
 ```js
 const query = datastore.createQuery('Post').filter('category', 'tech');
@@ -575,9 +627,22 @@ query.run().then(response => {
 });
 ```
 
-#### `mset(query, data [, query2, data2, ...])`
+#### `mset(query, data [, query(n9, data(n), options])`
 
 Add multiple queries in the cache.
+
+* _options_: an optional object of options.
+
+```js
+{
+    ttl: 900, // custom TTL value for this wrap
+}
+
+// For multi-stores it can also be an object
+{
+    ttl: {  memory: 300, redis: 3600 }
+}
+```
 
 ```js
 const query1 = datastore.createQuery('Post').filter('category', 'tech');
@@ -585,7 +650,7 @@ const query2 = datastore.createQuery('User').filter('score', '>', 1000);
 
 Promise.all([query1.run(), query2.run()])
     .then(result => {
-        cache.queries.mset(query1, result[0], query2, result[1])
+        cache.queries.mset(query1, result[0], query2, result[1], { ttl: 900 })
             .then(() => ...);
     });
 ```

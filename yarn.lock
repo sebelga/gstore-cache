@@ -895,6 +895,12 @@ bytebuffer@~5:
   dependencies:
     long "~3"
 
+cache-manager-redis-store@^1.3.0:
+  version "1.3.0"
+  resolved "https://registry.yarnpkg.com/cache-manager-redis-store/-/cache-manager-redis-store-1.3.0.tgz#e249f9afe0260b4fb19de0a06755c82a456276d3"
+  dependencies:
+    redis "^2.7.1"
+
 cache-manager@^2.7.0:
   version "2.7.0"
   resolved "https://registry.yarnpkg.com/cache-manager/-/cache-manager-2.7.0.tgz#8477802d0a257bea0d36b92420ac8998e460b09d"
@@ -1321,6 +1327,10 @@ doctrine@^2.1.0:
 domain-browser@^1.1.1:
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/domain-browser/-/domain-browser-1.2.0.tgz#3d31f50191a6749dd1375a7f522e823d42e54eda"
+
+double-ended-queue@^2.1.0-0:
+  version "2.1.0-0"
+  resolved "https://registry.yarnpkg.com/double-ended-queue/-/double-ended-queue-2.1.0-0.tgz#103d3527fd31528f40188130c841efdd78264e5c"
 
 duplexify@^3.5.0:
   version "3.5.3"
@@ -2772,9 +2782,9 @@ mocha-lcov-reporter@^1.3.0:
   version "1.3.0"
   resolved "https://registry.yarnpkg.com/mocha-lcov-reporter/-/mocha-lcov-reporter-1.3.0.tgz#469bdef4f8afc9a116056f079df6182d0afb0384"
 
-mocha@^5.0.0:
-  version "5.0.0"
-  resolved "https://registry.yarnpkg.com/mocha/-/mocha-5.0.0.tgz#cccac988b0bc5477119cba0e43de7af6d6ad8f4e"
+mocha@^5.0.1:
+  version "5.0.1"
+  resolved "https://registry.yarnpkg.com/mocha/-/mocha-5.0.1.tgz#759b62c836b0732382a62b6b1fb245ec1bc943ac"
   dependencies:
     browser-stdout "1.3.0"
     commander "2.11.0"
@@ -3423,9 +3433,25 @@ readdirp@^2.0.0:
     readable-stream "^2.0.2"
     set-immediate-shim "^1.0.1"
 
+redis-commands@^1.2.0:
+  version "1.3.3"
+  resolved "https://registry.yarnpkg.com/redis-commands/-/redis-commands-1.3.3.tgz#6fa6034d23bae1b65e0a196fed9d9a9fe6eb3c13"
+
 redis-mock@^0.20.0:
   version "0.20.0"
   resolved "https://registry.yarnpkg.com/redis-mock/-/redis-mock-0.20.0.tgz#94a395865babbcebf538b6b59941723e48073010"
+
+redis-parser@^2.6.0:
+  version "2.6.0"
+  resolved "https://registry.yarnpkg.com/redis-parser/-/redis-parser-2.6.0.tgz#52ed09dacac108f1a631c07e9b69941e7a19504b"
+
+redis@^2.7.1:
+  version "2.8.0"
+  resolved "https://registry.yarnpkg.com/redis/-/redis-2.8.0.tgz#202288e3f58c49f6079d97af7a10e1303ae14b02"
+  dependencies:
+    double-ended-queue "^2.1.0-0"
+    redis-commands "^1.2.0"
+    redis-parser "^2.6.0"
 
 regenerate@^1.2.1:
   version "1.3.3"
@@ -3793,6 +3819,10 @@ sshpk@^1.7.0:
     jsbn "~0.1.0"
     tweetnacl "~0.14.0"
 
+stackback@0.0.2:
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/stackback/-/stackback-0.0.2.tgz#1ac8a0d9483848d1695e418b6d031a3c3ce68e3b"
+
 stream-browserify@^2.0.1:
   version "2.0.1"
   resolved "https://registry.yarnpkg.com/stream-browserify/-/stream-browserify-2.0.1.tgz#66266ee5f9bdb9940a4e4514cafb43bb71e5c9db"
@@ -4142,6 +4172,12 @@ which@^1.1.1, which@^1.2.9:
   resolved "https://registry.yarnpkg.com/which/-/which-1.3.0.tgz#ff04bdfc010ee547d780bec38e1ac1c2777d253a"
   dependencies:
     isexe "^2.0.0"
+
+why-is-node-running@2.0.0:
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/why-is-node-running/-/why-is-node-running-2.0.0.tgz#d56bb4145b079744d21eab01d4585f994821a298"
+  dependencies:
+    stackback "0.0.2"
 
 wide-align@^1.1.0:
   version "1.1.2"

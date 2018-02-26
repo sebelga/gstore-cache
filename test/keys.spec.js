@@ -377,6 +377,14 @@ describe('gstoreCache.keys', () => {
             });
         });
 
+        it('should set the TTL from options', () => {
+            sinon.spy(gsCache, 'set');
+            return gsCache.keys.set(key1, entity1, { ttl: 9988 }).then(() => {
+                const { args } = gsCache.set.getCall(0);
+                expect(args[2].ttl).equal(9988);
+            });
+        });
+
         it('should set ttl dynamically when multistore', done => {
             const stores = {};
             sinon.stub(nodeCacheManager, 'caching').callsFake(storeName => {
@@ -452,6 +460,15 @@ describe('gstoreCache.keys', () => {
             return gsCache.keys.mset(key1, {}, key2, {}).then(() => {
                 const { args } = gsCache.mset.getCall(0);
                 expect(args[4].ttl).equal(600);
+            });
+        });
+
+        it('should set the TTL from options', () => {
+            sinon.spy(gsCache, 'mset');
+
+            return gsCache.keys.mset(key1, {}, key2, {}, { ttl: 5533 }).then(() => {
+                const { args } = gsCache.mset.getCall(0);
+                expect(args[4].ttl).equal(5533);
             });
         });
     });

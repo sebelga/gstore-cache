@@ -10,7 +10,6 @@ const redisStore = require('cache-manager-redis-store');
 
 const gstoreCache = requireUncached('../lib');
 const { datastore } = require('../lib/utils');
-// const { queries } = require('./mocks/datastore');
 
 const ds = new Datastore({ projectId: 'gstore-cache-e2e-tests' });
 
@@ -111,6 +110,12 @@ describe('e2e (Datastore & Memory cache)', () => {
                             });
                     })
                 ));
+
+            it('should set multiple keys in cache and return saved values', () =>
+                cache.keys.mset(key1, data1, key2, data2).then(result => {
+                    expect(result[0]).equal(data1);
+                    expect(result[1]).equal(data2);
+                }));
 
             it('should set the key in the cache', () =>
                 cache.keys
@@ -221,7 +226,7 @@ describe('e2e (Datastore & Memory cache)', () => {
     });
 });
 
-describe('e2e (Datastore & Redis cache)', () => {
+describe('e2e (Datastore & Memory + Redis cache)', () => {
     let cache;
     let redisClient;
     let queryToString;
@@ -254,6 +259,32 @@ describe('e2e (Datastore & Redis cache)', () => {
         });
     });
 
+    describe('gstoreCache.keys', () => {
+        beforeEach(function TestGstoreCacheQueries(done) {
+            if (argv.e2e !== true) {
+                // Skip e2e tests suite
+                this.skip();
+            }
+            ds.save([{ key: k1, data: user1 }, { key: k2, data: user2 }]).then(() => done());
+        });
+
+        it('should add the entities to cache', () => {
+            const { store } = cache.config.stores[1];
+            sinon.spy(store, 'mset');
+            return ds.get([k1, k2]).then(([entities]) =>
+                cache.keys
+                    .mset(k1, entities[0], k2, entities[1], { ttl: { memory: 1122, redis: 3344 } })
+                    .then(result => {
+                        const { args } = store.mset.getCall(0);
+                        expect(args[4].ttl).equal(3344);
+
+                        expect(result[0]).deep.equal(user1);
+                        expect(result[1]).deep.equal(user2);
+                    })
+            );
+        });
+    });
+
     describe('gstoreCache.queries', () => {
         beforeEach(function TestGstoreCacheQueries(done) {
             if (argv.e2e !== true) {
@@ -264,31 +295,37 @@ describe('e2e (Datastore & Redis cache)', () => {
         });
 
         describe('set()', () => {
-            it('should add query data to Redis Cache + EntityKind Set', () =>
-                cache.queries.get(query).then(result1 => {
+            it('should add query data to Redis Cache + EntityKind Set', () => {
+                sinon.spy(redisClient, 'multi');
+
+                return cache.queries.get(query).then(result1 => {
                     assert.isUndefined(result1); // make sure the cache is empty
                     return query
                         .run()
-                        .then(result2 => cache.queries.set(query, result2))
-                        .then(
-                            () =>
-                                new Promise((resolve, reject) => {
-                                    redisClient.get(queryToString(query), (err, data) => {
-                                        if (err) {
-                                            return reject(err);
-                                        }
-                                        const response = JSON.parse(data);
-                                        const [entities] = response;
-                                        expect(entities[0]).contains(user1);
-                                        expect(entities[1]).contains(user2);
+                        .then(result2 => cache.queries.set(query, result2, { ttl: { memory: 1122, redis: 3344 } }))
+                        .then(() => {
+                            const args = redisClient.multi.getCall(0).args[0];
+                            expect(args[1]).contains('setex');
+                            expect(args[1]).contains(3344);
+                            redisClient.multi.restore();
 
-                                        // Make sure we saved the KEY Symbol
-                                        assert.isDefined(entities[0].__dsKey__);
-                                        assert.isDefined(entities[1].__dsKey__);
-                                        return resolve();
-                                    });
-                                })
-                        )
+                            return new Promise((resolve, reject) => {
+                                redisClient.get(queryToString(query), (err, data) => {
+                                    if (err) {
+                                        return reject(err);
+                                    }
+                                    const response = JSON.parse(data);
+                                    const [entities] = response;
+                                    expect(entities[0]).contains(user1);
+                                    expect(entities[1]).contains(user2);
+
+                                    // Make sure we saved the KEY Symbol
+                                    assert.isDefined(entities[0].__dsKey__);
+                                    assert.isDefined(entities[1].__dsKey__);
+                                    return resolve();
+                                });
+                            });
+                        })
                         .then(() =>
                             cache.queries.get(query).then(response => {
                                 const [entities] = response;
@@ -311,7 +348,8 @@ describe('e2e (Datastore & Redis cache)', () => {
                                     });
                                 })
                         );
-                }));
+                });
+            });
         });
 
         describe('wrap()', () => {
