@@ -207,7 +207,7 @@ describe('e2e (Datastore & Memory cache)', () => {
         });
 
         describe('mget() & mset()', () => {
-            it('should set and return multiple queries', () => {
+            it('should set and return multiple queries', () =>
                 cache.queries.mget(query, query2).then(result1 => {
                     assert.isUndefined(result1[0]);
                     assert.isUndefined(result1[1]);
@@ -220,8 +220,7 @@ describe('e2e (Datastore & Memory cache)', () => {
                             expect(users).deep.equal([user1, user2]);
                             expect(posts).deep.equal([post1, post2]);
                         });
-                });
-            });
+                }));
         });
     });
 });
@@ -291,7 +290,10 @@ describe('e2e (Datastore & Memory + Redis cache)', () => {
                 // Skip e2e tests suite
                 this.skip();
             }
-            ds.save([{ key: k1, data: user1 }, { key: k2, data: user2 }]).then(() => done());
+            Promise.all([
+                ds.save([{ key: k1, data: user1 }, { key: k2, data: user2 }]),
+                ds.save([{ key: k3, data: post1 }, { key: k4, data: post2 }]),
+            ]).then(() => done());
         });
 
         describe('set()', () => {
@@ -350,6 +352,35 @@ describe('e2e (Datastore & Memory + Redis cache)', () => {
                         );
                 });
             });
+        });
+
+        describe('mget() & mset()', () => {
+            it('should set and return multiple queries', () =>
+                cache.queries.mget(query, query2).then(result1 => {
+                    assert.isUndefined(result1[0]);
+                    assert.isUndefined(result1[1]);
+
+                    let resQuery1;
+                    let resQuery2;
+
+                    return Promise.all([query.run(), query2.run()])
+                        .then(result2 => {
+                            [resQuery1, resQuery2] = result2;
+                            return cache.queries.mset(query, resQuery1, query2, resQuery2, { ttl: 600 });
+                        })
+                        .then(result3 => {
+                            expect(result3[0]).deep.equal(resQuery1);
+                            expect(result3[1]).deep.equal(resQuery2);
+
+                            return cache.queries.mget(query, query2);
+                        })
+                        .then(result4 => {
+                            const [users] = result4[0];
+                            const [posts] = result4[1];
+                            expect(users).deep.equal([user1, user2]);
+                            expect(posts).deep.equal([post1, post2]);
+                        });
+                }));
         });
 
         describe('wrap()', () => {
