@@ -4,17 +4,19 @@ https://raw.githubusercontent.com/dbader/readme-template/master/README.md
 
 # gstore cache
 
-> Advanced Cache Manager for Google Datastore
+> Advanced Cache Manager for the Google Datastore
 
 [![NPM Version][npm-image]][npm-url]
 [![Build Status][travis-image]][travis-url]
 [![coveralls-image]][coveralls-url]
 
+<img title="logo" src="logo/logo.gif" width="85%" align="center">
+
 gstore cache will speed up your Datastore entities fetching by providing an advanced cache layer for the [@google-cloud/datastore](https://cloud.google.com/nodejs/docs/reference/datastore/1.3.x/) Key and Query API.
 
 * Define **multiple cache stores** with different TTL thanks to [node-cache-manager](https://github.com/BryanDonovan/node-cache-manager).
 * **LRU memory cache** out of the box to speed up your application right away.
-* Datastore Key and Query objects are converted to **unique string ids** easy to cache.
+* Datastore <Key> and <Query> objects are converted to **unique string ids** easy to cache.
 * Advanced cache (when using [node_redis](https://github.com/NodeRedis/node_redis)) that automatically saves your queries in Redis "Sets" by **Entity Kind**. You can then set an **infinite TTL** (time to live) for your queries and only invalidate the cache when you _add_, _edit_ or _delete_ an entity Kind.
 
 ## Installation
@@ -74,7 +76,10 @@ The "gstoreInstance.keys.**wrap()**" helper above is syntactic sugar for the fol
 const Datastore = require('@google-cloud/datastore');
 const gstoreCache = require('gstore-cache');
 
-// After you initialized the cache (once at app bootstrap), this is how you get its instance
+/**
+ * After you initialized the cache (once during application bootstrap)
+ * you can get its instance anywhere calling "instance()".
+ */
 const cache = gstoreCache.instance();
 
 const datastore = new Datastore();
@@ -172,10 +177,14 @@ cache.queries
 
 ### Advanced Queries Caching
 
-gstore cache has an advanced cache mechanism for the queries when you provide a Redis client.  
-If you provide a redis store **and** you set the ttl for the queries to **0** then when you wrap() or set() a query in the cache, its Entity Kind will be detected and the cache _key_ will be added to a _Set_ in Redis for the corresponding Entity Kind. This means that you can safely have the query response in the cache infinitely until you either add, edit or delete an entity of the same _Kind_.
+gstore cache has an **advanced cache mechanism** for the queries when you provide a Redis client.  
+
+If you provide a redis store then when you _wrap()_ or _set()_ a query, gstore cache not only saves the response of the query in the cache(s), but it also detects the Entity _Kind_ of the query and saves a reference to this query in a Redis _Set_.  
+This means that you can safely have the query data in the cache infinitely until you either _add_, _edit_ or _delete_ an entity of the same _Kind_.
 
 ```js
+// server.js
+
 const Datastore = require('@google-cloud/datastore');
 const gstoreCache = require('gstore-cache');
 const redisStore = require('cache-manager-redis-store');
@@ -186,14 +195,14 @@ const cache = gstoreCache.init({
     datastore,
     config: {
         stores: [{ store: redisStore }],
-        ttl: {
-            keys: 600,
-            queries: 0, // important
-        },
     },
 });
 
-// ...in some handler
+// ...
+```
+
+```js
+// ...some handler
 
 const query = datastore
     .createQuery('Post')
@@ -212,7 +221,7 @@ query.run()
             .then(...);
     });
 
-// The query has an infinite TTL. You invalidate the cache  only when
+// You can now invalidate the cache only when
 // you create/edit or delete a "Posts" entity.
 
 const key = datastore.key(['Posts']);
@@ -246,6 +255,7 @@ Initialize gstore cache. You only needs to do it once, on application bootstrap.
 The **config** object has the following properties:
 
 * _stores_: An array of "cache-manager" stores. Each store is an object that will be passed to the `cacheManager.caching()` method. [Read the docs](https://github.com/BryanDonovan/node-cache-manager) to learn more about _node cache manager_.  
+
   **Important:** Since version 2.7.0 "cache-manager" allows you to set, get and delete **multiple keys** (with mset, mget and del). The store(s) you provide here must support this feature.  
   At the time of this writting only the "memory" store and the "[node-cache-manager-redis-store](https://github.com/dabroek/node-cache-manager-redis-store)" support it. If you provide a store that does not support mset/mget you can still use gstore-cache but you won't be able to set or retrieve multiple keys/queries at once.
 
@@ -266,7 +276,7 @@ gstoreCache.init({
 });
 ```
 
-* _ttl_: An object of TTL configuration for Keys and Queries. This is where you define the TTL (Time To Live) in seconds for the **Key** caching and **Query** caching.
+* _ttl_: An object of TTL configuration for Keys and Queries. This is where you define the TTL (Time To Live) in **seconds** for the _Key_ caching and _Query_ caching. You can override this value on any wrap/set/mset call later.
 
 ```js
 const config = {
@@ -286,7 +296,7 @@ const config = {
     ttl: {
         stores: {
             memory: {
-                keys: 300, // 5minutes
+                keys: 300, // 5 minutes
                 queries: 5,
             },
             redis: {
@@ -365,7 +375,7 @@ wrap is a helper that will: check the cache, if no entity(ies) are found in the 
 
 ```js
 {
-    ttl: 900, // custom TTL value for this wrap
+    ttl: 900, // custom TTL value
 }
 
 // For multi-stores it can also be an object
@@ -408,6 +418,8 @@ const fetchHandler = (key) => (
             return query.run()
                 .then(response => {
                     company.posts = response[0];
+
+                    // This is the data that will be saved in the cache
                     return company;
                 });
         });
@@ -459,7 +471,7 @@ Add an entity in the cache.
 
 ```js
 {
-    ttl: 900, // custom TTL value for this wrap
+    ttl: 900, // custom TTL value
 }
 
 // For multi-stores it can also be an object
@@ -486,7 +498,7 @@ Add multiple entities in the cache.
 
 ```js
 {
-    ttl: 900, // custom TTL value for this wrap
+    ttl: 900, // custom TTL value
 }
 
 // For multi-stores it can also be an object
@@ -503,7 +515,7 @@ datastore.get([key1, key2]).then(response => {
     const [entities] = response;
 
     // warning: the datastore.get() method (passing multiple keys) does not garantee
-    // the order of the returned entities. You will need to add some logic to order
+    // the order of the returned entities. You will need to add some logic to sort
     // the response or use the "wrap" helper above that does it for you.
 
     cache.keys.mset(key1, entities[0], key2, entities[1], { ttl: 240 }).then(() => ...);
@@ -524,7 +536,7 @@ wrap is a helper that will: check the cache, if the query is not found in the ca
 
 ```js
 {
-    ttl: 900, // custom TTL value for this wrap
+    ttl: 900, // custom TTL value
 }
 
 // For multi-stores it can also be an object
@@ -608,7 +620,7 @@ Add a query in the cache
 
 ```js
 {
-    ttl: 900, // custom TTL value for this wrap
+    ttl: 900, // custom TTL value
 }
 
 // For multi-stores it can also be an object
@@ -627,7 +639,7 @@ query.run().then(response => {
 });
 ```
 
-#### `mset(query, data [, query(n9, data(n), options])`
+#### `mset(query, data [, query(n), data(n), options])`
 
 Add multiple queries in the cache.
 
@@ -635,7 +647,7 @@ Add multiple queries in the cache.
 
 ```js
 {
-    ttl: 900, // custom TTL value for this wrap
+    ttl: 900, // custom TTL value
 }
 
 // For multi-stores it can also be an object
@@ -731,7 +743,7 @@ datastore.save({ key, data })
 
 ### "cache-manager" methods bindings (get, mget, set, mset, del, reset)
 
-gstore cache has bindings set to the underlying "cache-manager" methods _get_, _mget_, _set_, _mset_, _del_ and _reset_. This allows you to cache any other data you need. Refer the the cache-manager documentation.
+gstore cache has bindings set to the underlying "cache-manager" methods _get_, _mget_, _set_, _mset_, _del_ and _reset_. This allows you to cache any other data you need. Refer to [the cache-manager documentation](https://github.com/BryanDonovan/node-cache-manager).
 
 ```js
 const gstoreCache = require('gstore-cache');
