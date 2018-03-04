@@ -3,7 +3,8 @@
     "root": true,
     "env": {
         "node": true,
-        "jasmine": true
+        "jasmine": true,
+        "mocha": true
     },
     "parserOptions": {
         "ecmaVersion": 6,
