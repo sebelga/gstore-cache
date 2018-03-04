@@ -12,7 +12,8 @@ https://raw.githubusercontent.com/dbader/readme-template/master/README.md
 
 <img title="logo" src="logo/logo.gif" width="85%" align="center">
 
-gstore cache speeds up your Datastore entities fetching by providing an advanced cache layer for the [@google-cloud/datastore](https://cloud.google.com/nodejs/docs/reference/datastore/1.3.x/) Key and Query API.
+gstore cache speeds up your Datastore entities fetching by providing an advanced cache layer  
+for the [@google-cloud/datastore](https://cloud.google.com/nodejs/docs/reference/datastore/1.3.x/) _Key(s)_ and _Query_ API.
 
 * Define **multiple cache stores** with different TTL thanks to [node-cache-manager](https://github.com/BryanDonovan/node-cache-manager).
 * **LRU memory cache** out of the box to speed up your application right away.
@@ -179,7 +180,7 @@ cache.queries
 
 gstore cache has an **advanced cache mechanism** for the queries when you provide a Redis client.  
 
-If you provide a redis store then when you _read()_ or _set()_ a query, gstore cache not only saves the response of the query in the cache(s), but it also detects the Entity _Kind_ of the query and saves a reference to this query in a Redis _Set_.  
+If you provide a Redis store then when you _read()_ or _set()_ a query, gstore cache not only saves the response of the query in the cache(s), but it also detects the Entity _Kind_ of the query and saves a **reference** of the query in a Redis _Set_.  
 This means that you can safely have the query data in the cache infinitely until you either _add_, _edit_ or _delete_ an entity of the same _Kind_.
 
 ```js
@@ -809,7 +810,6 @@ Sébastien Loix – [@sebloix](https://twitter.com/sebloix) – sebastien@loix.m
 Distributed under the MIT license. See `LICENSE` for more information.
 
 [https://github.com/sebelga](https://github.com/sebelga/)  
-[http://s.loix.me](http://s.loix.me)
 
 ## Contributing
 
