@@ -32,7 +32,7 @@ describe('gstoreCache.queries', () => {
         },
     };
 
-    describe('wrap()', () => {
+    describe('read()', () => {
         const gstoreCache = requireUncached('../lib');
         let defaultConfig;
 
@@ -75,7 +75,7 @@ describe('gstoreCache.queries', () => {
             const strQuery = queryToString(query1);
             sinon.spy(gsCache, 'primeCache');
 
-            return gsCache.queries.wrap(query1, methods.fetchHandler).then(result => {
+            return gsCache.queries.read(query1, methods.fetchHandler).then(result => {
                 expect(methods.fetchHandler.called).equal(true);
                 expect(result).equal(queryRes);
                 expect(gsCache.primeCache.getCall(0).args[0]).equal(strQuery);
@@ -91,7 +91,7 @@ describe('gstoreCache.queries', () => {
         it('should get query from cache (1)', () => {
             cacheManager.set(queryToString(query1), queryRes);
 
-            return gsCache.queries.wrap(query1, methods.fetchHandler).then(result => {
+            return gsCache.queries.read(query1, methods.fetchHandler).then(result => {
                 expect(methods.fetchHandler.called).equal(false);
                 expect(result[0].name).equal(queryRes[0].name);
             });
@@ -101,14 +101,14 @@ describe('gstoreCache.queries', () => {
             gsCache.config.global = false;
             cacheManager.set(queryToString(query1), queryRes);
 
-            return gsCache.queries.wrap(query1, { cache: true }, methods.fetchHandler).then(result => {
+            return gsCache.queries.read(query1, { cache: true }, methods.fetchHandler).then(result => {
                 expect(methods.fetchHandler.called).equal(false);
                 expect(result[0].name).equal(queryRes[0].name);
             });
         });
 
         it('should prime the cache after fetch', () =>
-            gsCache.queries.wrap(query1, methods.fetchHandler).then(() =>
+            gsCache.queries.read(query1, methods.fetchHandler).then(() =>
                 gsCache.cacheManager.get(queryToString(query1)).then(result => {
                     expect(result[0].name).equal(queryRes[0].name);
                 })
@@ -117,7 +117,7 @@ describe('gstoreCache.queries', () => {
         it('should get query from *default* fetchHandler', () => {
             sinon.stub(query1, 'run').resolves(queryRes);
 
-            return gsCache.queries.wrap(query1, { cache: true }).then(result => {
+            return gsCache.queries.read(query1, { cache: true }).then(result => {
                 expect(query1.run.called).equal(true);
                 expect(result[0].name).equal(queryRes[0].name);
 
@@ -130,7 +130,7 @@ describe('gstoreCache.queries', () => {
         it('should set the TTL from config', () => {
             sinon.spy(gsCache.cacheManager, 'mset');
 
-            return gsCache.queries.wrap(query1, methods.fetchHandler).then(() => {
+            return gsCache.queries.read(query1, methods.fetchHandler).then(() => {
                 assert.ok(gsCache.cacheManager.mset.called);
                 const { args } = gsCache.cacheManager.mset.getCall(0);
                 expect(args[2].ttl).equal(5);
@@ -141,7 +141,7 @@ describe('gstoreCache.queries', () => {
         it('should set the TTL from options', () => {
             sinon.spy(gsCache.cacheManager, 'mset');
 
-            return gsCache.queries.wrap(query1, { ttl: 556 }).then(() => {
+            return gsCache.queries.read(query1, { ttl: 556 }).then(() => {
                 assert.ok(gsCache.cacheManager.mset.called);
                 const { args } = gsCache.cacheManager.mset.getCall(0);
                 expect(args[2].ttl).equal(556);
@@ -182,7 +182,7 @@ describe('gstoreCache.queries', () => {
                     sinon.spy(stores.memory.store, 'set');
                     sinon.spy(gsCache.redisClient, 'multi');
 
-                    gsCache.queries.wrap(query1, methods.fetchHandler).then(() => {
+                    gsCache.queries.read(query1, methods.fetchHandler).then(() => {
                         const options = gsCache.cacheManagerNoRedis.mset.getCall(0).args[2];
                         const optMemory = stores.memory.store.set.getCall(0).args[2];
                         const argsRedis = gsCache.redisClient.multi.getCall(0).args[0];
@@ -192,7 +192,7 @@ describe('gstoreCache.queries', () => {
                         expect(argsRedis[1]).contains('setex');
                         expect(argsRedis[1]).contains(2468);
 
-                        return gsCache.queries.wrap(query1, { ttl: { memory: 4455, redis: 6677 } }).then(() => {
+                        return gsCache.queries.read(query1, { ttl: { memory: 4455, redis: 6677 } }).then(() => {
                             const options2 = gsCache.cacheManagerNoRedis.mset.getCall(0).args[2];
                             const optMemory2 = stores.memory.store.set.getCall(1).args[2];
                             const argsRedis2 = gsCache.redisClient.multi.getCall(1).args[0];
@@ -221,7 +221,7 @@ describe('gstoreCache.queries', () => {
             const error = new Error('Houston we got an error');
             methods.fetchHandler.rejects(error);
 
-            gsCache.queries.wrap(query1, methods.fetchHandler).catch(err => {
+            gsCache.queries.read(query1, methods.fetchHandler).catch(err => {
                 expect(err.message).equal('Houston we got an error');
                 done();
             });
@@ -232,12 +232,12 @@ describe('gstoreCache.queries', () => {
 
             beforeEach(() => {
                 sinon.spy(gsCache, 'primeCache');
-                sinon.spy(gsCache.queries, 'cacheQueryEntityKind');
+                sinon.spy(gsCache.queries, 'kset');
             });
 
             afterEach(() => {
                 gsCache.primeCache.restore();
-                gsCache.queries.cacheQueryEntityKind.restore();
+                gsCache.queries.kset.restore();
             });
 
             it('should not prime the cache and save the query in its entity Kind Set', done => {
@@ -257,11 +257,11 @@ describe('gstoreCache.queries', () => {
                     gsCache.removeListener('ready', onReady);
                     const queryKey = queryToString(query1);
 
-                    gsCache.queries.wrap(query1, methods.fetchHandler).then(result => {
+                    gsCache.queries.read(query1, methods.fetchHandler).then(result => {
                         expect(gsCache.primeCache.called).equal(false);
-                        expect(gsCache.queries.cacheQueryEntityKind.called).equal(true);
+                        expect(gsCache.queries.kset.called).equal(true);
 
-                        const { args } = gsCache.queries.cacheQueryEntityKind.getCall(0);
+                        const { args } = gsCache.queries.kset.getCall(0);
                         expect(args[0]).equal(queryKey);
                         expect(args[1][0][0]).contains(queryRes[0][0]);
                         expect(args[1][1]).equal(queryRes[1]);
@@ -409,10 +409,10 @@ describe('gstoreCache.queries', () => {
             let cache;
 
             beforeEach(() => {
-                sinon.spy(gsCache.queries, 'cacheQueryEntityKind');
+                sinon.spy(gsCache.queries, 'kset');
             });
             afterEach(() => {
-                gsCache.queries.cacheQueryEntityKind.restore();
+                gsCache.queries.kset.restore();
             });
 
             it('should not prime the cache and save the query in its entity Kind Set', done => {
@@ -434,7 +434,7 @@ describe('gstoreCache.queries', () => {
 
                     gsCache.queries.set(query1, queryRes).then(() => {
                         expect(gsCache.set.called).equal(false);
-                        expect(gsCache.queries.cacheQueryEntityKind.called).equal(false);
+                        expect(gsCache.queries.kset.called).equal(false);
 
                         const argsRedis = gsCache.redisClient.multi.getCall(0).args[0];
                         expect(argsRedis[1]).contains('setex');
@@ -507,10 +507,10 @@ describe('gstoreCache.queries', () => {
             let cache;
 
             beforeEach(() => {
-                sinon.spy(gsCache.queries, 'cacheQueryEntityKind');
+                sinon.spy(gsCache.queries, 'kset');
             });
             afterEach(() => {
-                gsCache.queries.cacheQueryEntityKind.restore();
+                gsCache.queries.kset.restore();
             });
 
             it('should not prime the cache and save the query in its entity Kind Set', done => {
@@ -534,16 +534,16 @@ describe('gstoreCache.queries', () => {
 
                     gsCache.queries.mset(query1, queryRes, query2, queryRes2).then(result => {
                         expect(gsCache.mset.called).equal(false);
-                        expect(gsCache.queries.cacheQueryEntityKind.callCount).equal(2);
+                        expect(gsCache.queries.kset.callCount).equal(2);
 
-                        const { args: args1 } = gsCache.queries.cacheQueryEntityKind.getCall(0);
+                        const { args: args1 } = gsCache.queries.kset.getCall(0);
                         const [qKey, qValue, qEntiyKind] = args1;
                         expect(qKey).equal(queryKey);
                         expect(qValue[0][0]).contains(queryRes[0][0]);
                         expect(qValue[1]).equal(queryRes[1]);
                         expect(qEntiyKind).equal('Company');
 
-                        const { args: args2 } = gsCache.queries.cacheQueryEntityKind.getCall(1);
+                        const { args: args2 } = gsCache.queries.kset.getCall(1);
                         expect(args2[0]).equal(queryKey2);
                         expect(args2[1][0][0]).contains(queryRes2[0][0]);
                         expect(args2[2]).equal('User');
@@ -596,7 +596,7 @@ describe('gstoreCache.queries', () => {
             }));
     });
 
-    describe('cacheQueryEntityKind', () => {
+    describe('kset', () => {
         const gstoreCache = requireUncached('../lib');
 
         beforeEach(done => {
@@ -627,7 +627,7 @@ describe('gstoreCache.queries', () => {
             const queryKey = queryToString(query1);
             sinon.spy(redisClient, 'multi');
 
-            return gsCache.queries.cacheQueryEntityKind(queryKey, queryRes, 'User').then(() => {
+            return gsCache.queries.kset(queryKey, queryRes, 'User').then(() => {
                 assert.ok(redisClient.multi.called);
                 const { args } = redisClient.multi.getCall(0);
                 expect(args[0][0]).deep.equal(['sadd', `${prefix}User`, queryKey]);
@@ -641,7 +641,7 @@ describe('gstoreCache.queries', () => {
             const queryKey = queryToString(query1);
             sinon.spy(redisClient, 'multi');
 
-            return gsCache.queries.cacheQueryEntityKind(queryKey, queryRes, ['User', 'Task', 'Post']).then(() => {
+            return gsCache.queries.kset(queryKey, queryRes, ['User', 'Task', 'Post']).then(() => {
                 assert.ok(redisClient.multi.called);
                 const { args } = redisClient.multi.getCall(0);
                 expect(args[0][0]).deep.equal(['sadd', `${prefix}User`, queryKey]);
@@ -659,7 +659,7 @@ describe('gstoreCache.queries', () => {
                 exec: cb => cb(null, response),
             });
 
-            return gsCache.queries.cacheQueryEntityKind().then(res => {
+            return gsCache.queries.kset().then(res => {
                 expect(res).equal(response);
             });
         });
@@ -668,7 +668,7 @@ describe('gstoreCache.queries', () => {
             const error = new Error('Houston we got a problem');
             sinon.stub(redisClient, 'multi').callsFake(() => ({ exec: cb => cb(error) }));
 
-            return gsCache.queries.cacheQueryEntityKind().catch(err => {
+            return gsCache.queries.kset().catch(err => {
                 expect(err).equal(error);
                 redisClient.multi.restore();
             });
@@ -680,7 +680,7 @@ describe('gstoreCache.queries', () => {
             const onReady = () => {
                 gsCache.removeListener('ready', onReady);
 
-                gsCache.queries.cacheQueryEntityKind().catch(err => {
+                gsCache.queries.kset().catch(err => {
                     expect(err.message).equal('No Redis Client found.');
                     done();
                 });
@@ -689,7 +689,7 @@ describe('gstoreCache.queries', () => {
         });
     });
 
-    describe('cleanQueriesEntityKind', () => {
+    describe('clearQueriesEntityKind', () => {
         const gstoreCache = requireUncached('../lib');
 
         beforeEach(ready => {
@@ -722,7 +722,7 @@ describe('gstoreCache.queries', () => {
             }));
             sinon.stub(redisClient, 'del').callsFake((keys, cb) => cb(null, 7));
 
-            return gsCache.queries.cleanQueriesEntityKind('User').then(res => {
+            return gsCache.queries.clearQueriesEntityKind('User').then(res => {
                 assert.ok(redisClient.multi.called);
                 assert.ok(redisClient.del.called);
                 const { args: argsMulti } = redisClient.multi.getCall(0);
@@ -742,7 +742,7 @@ describe('gstoreCache.queries', () => {
             const error = new Error('Houston we really got a problem');
             sinon.stub(redisClient, 'multi').callsFake(() => ({ exec: cb => cb(error) }));
 
-            gsCache.queries.cleanQueriesEntityKind('User').catch(err => {
+            gsCache.queries.clearQueriesEntityKind('User').catch(err => {
                 expect(err).equal(error);
 
                 redisClient.multi.restore();
@@ -757,7 +757,7 @@ describe('gstoreCache.queries', () => {
                 cb(error);
             });
 
-            gsCache.queries.cleanQueriesEntityKind('User').catch(err => {
+            gsCache.queries.clearQueriesEntityKind('User').catch(err => {
                 expect(err).equal(error);
                 redisClient.del.restore();
                 done();
@@ -770,7 +770,7 @@ describe('gstoreCache.queries', () => {
             const onReady = () => {
                 gsCache.removeListener('ready', onReady);
 
-                gsCache.queries.cleanQueriesEntityKind('EntiyKind').catch(err => {
+                gsCache.queries.clearQueriesEntityKind('EntiyKind').catch(err => {
                     expect(err.message).equal('No Redis Client found.');
                     done();
                 });

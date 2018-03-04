@@ -124,7 +124,7 @@ describe('e2e (Datastore & Memory cache)', () => {
                         assert.isUndefined(result);
                     })
                     .then(() => cache.keys.set(key1, data1))
-                    .then(() => cache.keys.wrap(key1))
+                    .then(() => cache.keys.read(key1))
                     .then(result => {
                         expect(result).contains(data1);
                         expect(ds.get.called).equal(false);
@@ -136,16 +136,16 @@ describe('e2e (Datastore & Memory cache)', () => {
                     }));
         });
 
-        describe('wrap()', () => {
+        describe('read()', () => {
             it('should add data to cache', () =>
                 ds.save({ key: key1, data: data1 }).then(() =>
                     cache.keys
-                        .wrap(key1)
+                        .read(key1)
                         .then(result => {
                             expect(result).deep.equal(data1);
                         })
                         .then(() =>
-                            cache.keys.wrap(key1).then(result => {
+                            cache.keys.read(key1).then(result => {
                                 expect(result).deep.equal(data1);
                                 expect(result[ds.KEY]).equal(key1);
                                 expect(ds.get.callCount).equal(1);
@@ -156,13 +156,13 @@ describe('e2e (Datastore & Memory cache)', () => {
             it('should allow multiple keys', () =>
                 ds.save([{ key: key1, data: data1 }, { key: key2, data: data2 }]).then(() =>
                     cache.keys
-                        .wrap([key1, key2])
+                        .read([key1, key2])
                         .then(result => {
                             expect(result[0]).deep.equal(data1);
                             expect(result[1]).deep.equal(data2);
                         })
                         .then(() =>
-                            cache.keys.wrap([key1, key2]).then(result => {
+                            cache.keys.read([key1, key2]).then(result => {
                                 expect(result[0]).deep.equal(data1);
                                 expect(result[1]).deep.equal(data2);
                                 expect(result[0][ds.KEY]).equal(key1);
@@ -173,7 +173,7 @@ describe('e2e (Datastore & Memory cache)', () => {
                 ));
 
             it('should return undefined when Key not found', () =>
-                cache.keys.wrap(key1).then(result => {
+                cache.keys.read(key1).then(result => {
                     assert.isUndefined(result);
                 }));
         });
@@ -383,12 +383,12 @@ describe('e2e (Datastore & Memory + Redis cache)', () => {
                 }));
         });
 
-        describe('wrap()', () => {
+        describe('read()', () => {
             it('should add query data to Redis Cache + EntityKind Set', () =>
                 cache.queries.get(query).then(result1 => {
                     assert.isUndefined(result1); // make sure the cache is empty
                     return cache.queries
-                        .wrap(query)
+                        .read(query)
                         .then(response => {
                             const [entities] = response;
                             assert.isDefined(entities[0][ds.KEY]);
@@ -439,7 +439,7 @@ describe('e2e (Datastore & Memory + Redis cache)', () => {
                 }));
         });
 
-        describe('cacheQueryEntityKind()', () => {
+        describe('kset()', () => {
             const queryKey = 'my-query-key';
             const queryData = [{ id: 1, title: 'Post title', author: { name: 'John Snow' } }];
 
@@ -447,7 +447,7 @@ describe('e2e (Datastore & Memory + Redis cache)', () => {
                 cache.get(queryKey).then(result1 => {
                     assert.isUndefined(result1); // make sure the cache is empty
                     return cache.queries
-                        .cacheQueryEntityKind(queryKey, queryData, ['Post', 'Author'])
+                        .kset(queryKey, queryData, ['Post', 'Author'])
                         .then(
                             () =>
                                 new Promise((resolve, reject) => {
@@ -489,14 +489,14 @@ describe('e2e (Datastore & Memory + Redis cache)', () => {
                 }));
         });
 
-        describe('cleanQueriesEntityKind()', () => {
+        describe('clearQueriesEntityKind()', () => {
             it('should delete cache and remove from EntityKind Set', () =>
                 cache.queries.get(query).then(result1 => {
                     assert.isUndefined(result1); // make sure the cache is empty
                     return query
                         .run()
                         .then(result2 => cache.queries.set(query, result2))
-                        .then(() => cache.queries.cleanQueriesEntityKind('User'))
+                        .then(() => cache.queries.clearQueriesEntityKind('User'))
                         .then(
                             () =>
                                 // Check that Query Cache does not exist anymore
@@ -532,7 +532,7 @@ describe('e2e (Datastore & Memory + Redis cache)', () => {
                 return cache.get(queryKey).then(result1 => {
                     assert.isUndefined(result1); // make sure the cache is empty
                     return cache.queries
-                        .cacheQueryEntityKind(queryKey, queryData, ['Post', 'Author'])
+                        .kset(queryKey, queryData, ['Post', 'Author'])
                         .then(
                             () =>
                                 new Promise((resolve, reject) => {
@@ -549,7 +549,7 @@ describe('e2e (Datastore & Memory + Redis cache)', () => {
                                         });
                                 })
                         )
-                        .then(() => cache.queries.cleanQueriesEntityKind(['Post', 'Author']))
+                        .then(() => cache.queries.clearQueriesEntityKind(['Post', 'Author']))
                         .then(
                             () =>
                                 new Promise((resolve, reject) => {
