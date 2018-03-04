@@ -46,8 +46,6 @@ describe('gstoreCache.keys', () => {
         gsCache.removeAllListeners();
     });
 
-    // TODO.... change "read" by "read" ?? ----> react (16.3) createFetcher().read
-
     describe('read()', () => {
         it('should get entity from cache (1)', () => {
             sinon.spy(methods, 'fetchHandler');
@@ -150,6 +148,19 @@ describe('gstoreCache.keys', () => {
                         expect(cacheResponse[2].name).equal('Carol');
                         ds.get.restore();
                     });
+            });
+        });
+
+        it('should maintain the order of the keys passed (3)', () => {
+            cacheManager.set(keyToString(key1), entity1);
+            const e = {};
+            e[ds.KEY] = ds.key(['User', 'random']);
+            sinon.stub(ds, 'get').resolves([[undefined, e]]);
+
+            return gsCache.keys.read([key1, key2, key3]).then(result => {
+                expect(result[0].name).equal('John');
+                expect(result[1]).equal(null);
+                expect(result[2]).equal(null);
             });
         });
 
@@ -296,7 +307,7 @@ describe('gstoreCache.keys', () => {
             });
         });
 
-        it('should buble up the error from the fetch (1)', done => {
+        it('should bubble up the error from the fetch (1)', done => {
             const error = new Error('Houston we got an error');
 
             sinon.stub(methods, 'fetchHandler').rejects(error);

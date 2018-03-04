@@ -181,7 +181,13 @@ describe('gsCache', () => {
 
     describe('deleteCacheManager()', () => {
         it('should work', done => {
-            gsCache = gstoreCache.init();
+            gsCache = gstoreCache.init({
+                config: {
+                    // Cover the case were we have multiple store
+                    // bot **no** RedisClient
+                    stores: [{ store: 'memory' }, { store: 'memory' }],
+                },
+            });
 
             gsCache.deleteCacheManager(() => {
                 gsCache.deleteCacheManager(done);
