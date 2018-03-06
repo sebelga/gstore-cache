@@ -523,6 +523,21 @@ datastore.get([key1, key2]).then(response => {
 });
 ```
 
+#### `del(key [, key2, key3, ...])`
+
+Delete one or multiple keys from the cache
+
+```js
+const key1 = datastore.key(['Company', 'Google']);
+const key2 = datastore.key(['Company', 'Twitter']);
+
+// Single key
+cache.keys.del(key1).then(() => { ... });
+
+// Multiple keys
+cache.keys.del(key1, key2).then(() => { ... });
+```
+
 ---
 
 ### gstoreCacheInstance.queries
@@ -738,6 +753,21 @@ datastore.save({ key, data })
                 ...
             });
     });
+```
+
+#### `del(query [, query2, query3, ...])`
+
+Delete one or multiple queries from the cache
+
+```js
+const query1 = datastore.createQuery('Post').filter('category', 'tech');
+const query2 = datastore.createQuery('User').filter('score', '>', 1000);
+
+// Single query
+cache.queries.del(query1).then(() => { ... });
+
+// Multiple queries
+cache.queries.del(query1, query2).then(() => { ... });
 ```
 
 ---
