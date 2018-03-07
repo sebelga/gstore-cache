@@ -4,7 +4,7 @@ https://raw.githubusercontent.com/dbader/readme-template/master/README.md
 
 # gstore cache
 
-> Advanced Cache Manager for the Google Datastore
+> Advanced Cache Layer for the Google Datastore
 
 [![NPM Version][npm-image]][npm-url]
 [![Build Status][travis-image]][travis-url]
@@ -812,7 +812,7 @@ npm run coverage
 npm run prettier
 ```
 
-To run the e2e test you need to launch the Local Datastore emulator and a local Redis server.
+To run the integration tests you need to launch the Local Datastore emulator and a local Redis server.
 
 ```sh
 # Local Datastore
