@@ -1,0 +1,10 @@
+.coveralls.yml
+.eslintrc.json
+.prettierrc
+.travis.yml
+.babelrc
+
+test/
+logo/
+.vscode/
+**/.trash

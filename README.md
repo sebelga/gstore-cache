@@ -30,6 +30,8 @@ npm install gstore-cache --save
 yarn add gstore-cache
 ```
 
+**Info:** gstore-cache is fully integrated into _gstore-node_. If you are not (yet) using gstore-node to manage your Datastore entities, [have a look at the project](https://github.com/sebelga/gstore-node) te see see what you're missing!
+
 ## Usage example
 
 ### Datastore \<Key\>
