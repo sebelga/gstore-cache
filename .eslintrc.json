@@ -42,6 +42,7 @@
             {
                 "functions": false
             }
-        ]
+        ],
+        "object-curly-newline": 0
     }
 }

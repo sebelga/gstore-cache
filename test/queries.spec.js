@@ -849,6 +849,7 @@ describe('gstoreCache.queries', () => {
 
                 gsCache.queries.clearQueriesEntityKind('EntiyKind').catch(err => {
                     expect(err.message).equal('No Redis Client found.');
+                    expect(err.code).equal('ERR_NO_REDIS');
                     done();
                 });
             };
