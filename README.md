@@ -2,9 +2,9 @@
 https://raw.githubusercontent.com/dbader/readme-template/master/README.md
 -->
 
-# gstore cache
+# gstore cache [![Tweet](https://img.shields.io/twitter/url/http/shields.io.svg?style=social)](https://twitter.com/intent/tweet?text=Add%20a%20cache%20layer%20for%20the%20Google%20Datastore%20with%20gstore-cache%20%23Datastore%20https%3A%2F%2Fgithub.com%2Fsebelga%2Fgstore-cache)
 
-> Advanced Cache Manager for the Google Datastore
+> Advanced Cache Layer for the Google Datastore Node.js API
 
 [![NPM Version][npm-image]][npm-url]
 [![Build Status][travis-image]][travis-url]
@@ -12,12 +12,15 @@ https://raw.githubusercontent.com/dbader/readme-template/master/README.md
 
 <img title="logo" src="logo/logo.gif" width="85%" align="center">
 
-gstore cache will speed up your Datastore entities fetching by providing an advanced cache layer for the [@google-cloud/datastore](https://cloud.google.com/nodejs/docs/reference/datastore/1.3.x/) Key and Query API.
+gstore cache speeds up your Datastore entities fetching by providing an advanced cache layer  
+for the [@google-cloud/datastore](https://cloud.google.com/nodejs/docs/reference/datastore/1.3.x/) _Key_ and _Query_ API.
 
 * Define **multiple cache stores** with different TTL thanks to [node-cache-manager](https://github.com/BryanDonovan/node-cache-manager).
 * **LRU memory cache** out of the box to speed up your application right away.
 * Datastore <Key> and <Query> objects are converted to **unique string ids** easy to cache.
 * Advanced cache (when using [node_redis](https://github.com/NodeRedis/node_redis)) that automatically saves your queries in Redis "Sets" by **Entity Kind**. You can then set an **infinite TTL** (time to live) for your queries and only invalidate the cache when you _add_, _edit_ or _delete_ an entity Kind.
+
+> Please don’t forget to star this repo if you found it useful :)
 
 ## Installation
 
@@ -41,12 +44,12 @@ const cache = gstoreCache.init({ datastore });
 const key = datastore.key(['Company', 'Google']);
 
 /**
- * The "keys.wrap()" helper will
+ * The "keys.read()" helper will
  * - Look for the entity in the cache
  * - If not found, fetch it from the Datastore
  * - Prime the cache with the entity fetched from the Datastore.
  */
-cache.keys.wrap(key).then(entity => {
+cache.keys.read(key).then(entity => {
     console.log(entity);
     console.log(entity[datastore.KEY]); // the Key Symbol is added to the cached results
 });
@@ -63,14 +66,14 @@ const key1 = datastore.key(['Task', 123]); // this entity is in the cache
 const key2 = datastore.key(['Task', 456]); // this entity is in the cache
 const key3 = datastore.key(['Task', 789]);
 
-cache.keys.wrap([key1, key2, key3]).then(entities => {
+cache.keys.read([key1, key2, key3]).then(entities => {
     console.log(entities[0]);
     console.log(entities[1]);
     console.log(entities[2]);
 });
 ```
 
-The "gstoreInstance.keys.**wrap()**" helper above is syntactic sugar for the following:
+The "gstoreInstance.keys.**read()**" helper above is syntactic sugar for the following:
 
 ```js
 const Datastore = require('@google-cloud/datastore');
@@ -124,12 +127,12 @@ const query = datastore
     .limit(10);
 
 /**
- * Just like with the Keys, the "queries.wrap()" helper will
+ * Just like with the Keys, the "queries.read()" helper will
  * - Look for the query in the cache
  * - If not found, run the query on the Datastore
  * - Prime the cache with the response from the query.
  */
-cache.queries.wrap(query).then(response => {
+cache.queries.read(query).then(response => {
     const [entities, meta] = response;
 
     console.log(entities);
@@ -138,7 +141,7 @@ cache.queries.wrap(query).then(response => {
 });
 ```
 
-The "gstoreInstance.queries.**wrap()**" helper is syntactic sugar for the following:
+The "gstoreInstance.queries.**read()**" helper is syntactic sugar for the following:
 
 ```js
 const Datastore = require('@google-cloud/datastore');
@@ -179,7 +182,7 @@ cache.queries
 
 gstore cache has an **advanced cache mechanism** for the queries when you provide a Redis client.  
 
-If you provide a redis store then when you _wrap()_ or _set()_ a query, gstore cache not only saves the response of the query in the cache(s), but it also detects the Entity _Kind_ of the query and saves a reference to this query in a Redis _Set_.  
+If you provide a Redis store then when you _read()_ or _set()_ a query, gstore cache not only saves the response of the query in the cache(s), but it also detects the Entity _Kind_ of the query and saves a **reference** of the query in a Redis _Set_.  
 This means that you can safely have the query data in the cache infinitely until you either _add_, _edit_ or _delete_ an entity of the same _Kind_.
 
 ```js
@@ -208,8 +211,8 @@ const query = datastore
     .createQuery('Post')
     .limit(10);
 
-// with wrap()
-cache.queries.wrap(query)
+// with read()
+cache.queries.read(query)
     .then((response) => {
         ...
     });
@@ -230,7 +233,7 @@ const data = { title: 'My Post' };
 datastore.save({ key, data })
     .then(() => {
         // invalidate all the queries for "Posts" Entity Kind
-        cache.queries.cleanQueriesEntityKind(['Posts'])
+        cache.queries.clearQueriesEntityKind(['Posts'])
             .then(() => {
                 // No more cache for Posts queries
             });
@@ -276,7 +279,7 @@ gstoreCache.init({
 });
 ```
 
-* _ttl_: An object of TTL configuration for Keys and Queries. This is where you define the TTL (Time To Live) in **seconds** for the _Key_ caching and _Query_ caching. You can override this value on any wrap/set/mset call later.
+* _ttl_: An object of TTL configuration for Keys and Queries. This is where you define the TTL (Time To Live) in **seconds** for the _Key_ caching and _Query_ caching. You can override this value on any read/set/mset call later.
 
 ```js
 const config = {
@@ -365,9 +368,9 @@ Get the gstore cache instance.
 
 ### gstoreCacheInstance.keys
 
-#### `wrap(key|Array<key> [options, fetchHandler]])`
+#### `read(key|Array<key> [options, fetchHandler]])`
 
-wrap is a helper that will: check the cache, if no entity(ies) are found in the cache, it will fetch the entity(ies) in the Datastore. Finally it will prime the cache with the entity(ies).
+read is a helper that will: check the cache, if no entity(ies) are found in the cache, it will fetch the entity(ies) in the Datastore. Finally it will prime the cache with the entity(ies).
 
 * _key_: a Datastore Key or an Array of Datastore Keys. If it is an array of keys, only the keys that are **not found in the cache** will be passed to the fetchHandler.
 
@@ -398,7 +401,7 @@ const key = datastore.key(['Company', 'Google']);
 /**
  * 1. Basic example (using the default fetch handler)
  */
-cache.keys.wrap(key)
+cache.keys.read(key)
     .then(entity => console.log(entity));
 
 /**
@@ -425,13 +428,13 @@ const fetchHandler = (key) => (
         });
 );
 
-cache.keys.wrap(key, fetchHandler)
+cache.keys.read(key, fetchHandler)
     .then((entity) => {
         console.log(entity);
     });
 
 // or with a custom TTL
-cache.keys.wrap(key, { ttl: 900 }, fetchHandler)
+cache.keys.read(key, { ttl: 900 }, fetchHandler)
     .then((entity) => {
         console.log(entity);
     });
@@ -516,19 +519,34 @@ datastore.get([key1, key2]).then(response => {
 
     // warning: the datastore.get() method (passing multiple keys) does not garantee
     // the order of the returned entities. You will need to add some logic to sort
-    // the response or use the "wrap" helper above that does it for you.
+    // the response or use the "read" helper above that does it for you.
 
     cache.keys.mset(key1, entities[0], key2, entities[1], { ttl: 240 }).then(() => ...);
 });
+```
+
+#### `del(key [, key2, key3, ...])`
+
+Delete one or multiple keys from the cache
+
+```js
+const key1 = datastore.key(['Company', 'Google']);
+const key2 = datastore.key(['Company', 'Twitter']);
+
+// Single key
+cache.keys.del(key1).then(() => { ... });
+
+// Multiple keys
+cache.keys.del(key1, key2).then(() => { ... });
 ```
 
 ---
 
 ### gstoreCacheInstance.queries
 
-#### `wrap(query [, fetchHandler])`
+#### `read(query [, fetchHandler])`
 
-wrap is a helper that will: check the cache, if the query is not found in the cache, it will run the query on the Datastore. Finally it will prime the cache with the response of the query.
+read is a helper that will: check the cache, if the query is not found in the cache, it will run the query on the Datastore. Finally it will prime the cache with the response of the query.
 
 * _query_: a Datastore Query.
 
@@ -563,7 +581,7 @@ const query = datastore
 /**
  * 1. Basic example (using the default fetch handler)
  */
-cache.queries.wrap(query)
+cache.queries.read(query)
     .then(response => console.log(response[0]));
 
 /**
@@ -579,7 +597,7 @@ const fetchHandler = (q) => (
         });
 );
 
-cache.queries.wrap(query, fetchHandler)
+cache.queries.read(query, fetchHandler)
     .then((response) => {
         console.log(response[0]);
         console.log(response[1].moreResults);
@@ -667,7 +685,7 @@ Promise.all([query1.run(), query2.run()])
     });
 ```
 
-#### `cacheQueryEntityKind(key, value, entityKind|Array<EntityKind>)`
+#### `kset(key, value, entityKind|Array<EntityKind> [, options])`
 
 **Important:** this method is only available if you provided a _Redis_ store during initialization.
 
@@ -712,13 +730,13 @@ const fetchHomeData = () => {
             // We save the result of the 3 queries to the cache ("website:home" key)
             // and link the data to the "Posts" & "Products" Entity Kinds.
             // We can now safely keep the cache infinitely until we add/edit or delete a "Posts" or a "Products".
-            return cache.queries.cacheQueryEntityKind('website:home', homeData, ['Posts', 'Products']);
+            return cache.queries.kset('website:home', homeData, ['Posts', 'Products']);
         });
     });
 };
 ```
 
-#### `cleanQueriesEntityKind(entityKind|Array<EntityKind>)`
+#### `clearQueriesEntityKind(entityKind|Array<EntityKind>)`
 
 Delete all the queries linked to one or several Entity Kinds.
 
@@ -732,11 +750,26 @@ const data = { title: 'My new post', text: 'Body text of the post' };
 datastore.save({ key, data })
     .then(() => {
         // Invalidate all the queries linked to "Posts" Entity Kinds.
-        cache.queries.cleanQueriesEntityKind(['Posts'])
+        cache.queries.clearQueriesEntityKind(['Posts'])
             .then(() => {
                 ...
             });
     });
+```
+
+#### `del(query [, query2, query3, ...])`
+
+Delete one or multiple queries from the cache
+
+```js
+const query1 = datastore.createQuery('Post').filter('category', 'tech');
+const query2 = datastore.createQuery('User').filter('score', '>', 1000);
+
+// Single query
+cache.queries.del(query1).then(() => { ... });
+
+// Multiple queries
+cache.queries.del(query1, query2).then(() => { ... });
 ```
 
 ---
@@ -781,7 +814,7 @@ npm run coverage
 npm run prettier
 ```
 
-To run the e2e test you need to launch the Local Datastore emulator and a local Redis server.
+To run the integration tests you need to launch the Local Datastore emulator and a local Redis server.
 
 ```sh
 # Local Datastore
@@ -804,12 +837,11 @@ gcloud beta emulators datastore start --data-dir=$PWD/local-datastore
 
 ## Meta
 
-Sébastien Loix – [@sebloix](https://twitter.com/sebloix) – sebastien@loix.me
+Sébastien Loix – [@sebloix](https://twitter.com/sebloix)
 
 Distributed under the MIT license. See `LICENSE` for more information.
 
 [https://github.com/sebelga](https://github.com/sebelga/)  
-[http://s.loix.me](http://s.loix.me)
 
 ## Contributing
 

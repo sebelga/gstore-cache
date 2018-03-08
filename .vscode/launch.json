@@ -15,9 +15,9 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "Mocha e2e Tests",
+            "name": "Mocha Integration Tests",
             "program": "${workspaceFolder}/node_modules/mocha/bin/_mocha",
-            "args": ["-u", "tdd", "--timeout", "999999", "--colors", "${workspaceFolder}/test/e2e.spec.js", "--e2e"],
+            "args": ["-u", "tdd", "--timeout", "999999", "--colors", "${workspaceFolder}/test/int", "--e2e"],
             "internalConsoleOptions": "openOnSessionStart",
             "env": {
                 "DATASTORE_EMULATOR_HOST": "localhost:8081"

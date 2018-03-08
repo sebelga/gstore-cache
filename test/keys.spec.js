@@ -46,13 +46,13 @@ describe('gstoreCache.keys', () => {
         gsCache.removeAllListeners();
     });
 
-    describe('wrap()', () => {
+    describe('read()', () => {
         it('should get entity from cache (1)', () => {
             sinon.spy(methods, 'fetchHandler');
             const value = { name: string.random() };
             cacheManager.set(keyToString(key1), value);
 
-            return gsCache.keys.wrap(key1, methods.fetchHandler).then(result => {
+            return gsCache.keys.read(key1, methods.fetchHandler).then(result => {
                 expect(methods.fetchHandler.called).equal(false);
                 expect(result.name).equal(value.name);
                 expect(result[ds.KEY]).equal(key1);
@@ -64,7 +64,7 @@ describe('gstoreCache.keys', () => {
             gsCache.config.global = false;
             cacheManager.mset(keyToString(key1), entity1, keyToString(key2), entity2);
 
-            return gsCache.keys.wrap([key1, key2], { cache: true }, methods.fetchHandler).then(results => {
+            return gsCache.keys.read([key1, key2], { cache: true }, methods.fetchHandler).then(results => {
                 expect(methods.fetchHandler.called).equal(false);
                 expect(results[0].name).equal('John');
                 expect(results[1].name).equal('Mick');
@@ -76,7 +76,7 @@ describe('gstoreCache.keys', () => {
         it('should get entity from fetchHandler', () => {
             sinon.stub(methods, 'fetchHandler').resolves([entity3]);
 
-            return gsCache.keys.wrap(key3, methods.fetchHandler).then(result => {
+            return gsCache.keys.read(key3, methods.fetchHandler).then(result => {
                 expect(methods.fetchHandler.called).equal(true);
                 expect(result.name).equal('Carol');
 
@@ -89,7 +89,7 @@ describe('gstoreCache.keys', () => {
         it('should get entity from fetchHandler (2)', () => {
             sinon.stub(methods, 'fetchHandler').resolves([[entity1, entity2]]);
 
-            return gsCache.keys.wrap([key1, key2], methods.fetchHandler).then(result => {
+            return gsCache.keys.read([key1, key2], methods.fetchHandler).then(result => {
                 expect(methods.fetchHandler.called).equal(true);
                 expect(methods.fetchHandler.getCall(0).args[0].length).equal(2);
                 expect(result[0].name).equal('John');
@@ -105,7 +105,7 @@ describe('gstoreCache.keys', () => {
         it('should get entity from *default* fetchHandler', () => {
             sinon.stub(ds, 'get').resolves([entity3]);
 
-            return gsCache.keys.wrap(key3, { cache: true }).then(result => {
+            return gsCache.keys.read(key3, { cache: true }).then(result => {
                 expect(ds.get.called).equal(true);
                 expect(result.name).equal('Carol');
 
@@ -119,7 +119,7 @@ describe('gstoreCache.keys', () => {
         it('should maintain the order of the keys passed (1)', () => {
             sinon.stub(ds, 'get').resolves([[entity2, entity1]]);
 
-            return gsCache.keys.wrap([key1, key2]).then(result => {
+            return gsCache.keys.read([key1, key2]).then(result => {
                 expect(result[0].name).equal('John');
                 expect(result[1].name).equal('Mick');
 
@@ -135,7 +135,7 @@ describe('gstoreCache.keys', () => {
             cacheManager.set(keyToString(key1), entity1);
             sinon.stub(ds, 'get').resolves([[entity3, entity2]]);
 
-            return gsCache.keys.wrap([key1, key2, key3]).then(result => {
+            return gsCache.keys.read([key1, key2, key3]).then(result => {
                 expect(result[0].name).equal('John');
                 expect(result[1].name).equal('Mick');
                 expect(result[2].name).equal('Carol');
@@ -151,11 +151,24 @@ describe('gstoreCache.keys', () => {
             });
         });
 
+        it('should maintain the order of the keys passed (3)', () => {
+            cacheManager.set(keyToString(key1), entity1);
+            const e = {};
+            e[ds.KEY] = ds.key(['User', 'random']);
+            sinon.stub(ds, 'get').resolves([[undefined, e]]);
+
+            return gsCache.keys.read([key1, key2, key3]).then(result => {
+                expect(result[0].name).equal('John');
+                expect(result[1]).equal(null);
+                expect(result[2]).equal(null);
+            });
+        });
+
         it('should set the TTL from config (1)', () => {
             sinon.spy(gsCache.cacheManager, 'mset');
             sinon.stub(methods, 'fetchHandler').resolves([entity1]);
 
-            return gsCache.keys.wrap(key1, methods.fetchHandler).then(() => {
+            return gsCache.keys.read(key1, methods.fetchHandler).then(() => {
                 assert.ok(gsCache.cacheManager.mset.called);
                 const { args } = gsCache.cacheManager.mset.getCall(0);
                 expect(args[2].ttl).equal(600);
@@ -169,7 +182,7 @@ describe('gstoreCache.keys', () => {
             sinon.spy(gsCache.cacheManager, 'mset');
             sinon.stub(methods, 'fetchHandler').resolves([entity2]);
 
-            return gsCache.keys.wrap([key1, key2], methods.fetchHandler).then(() => {
+            return gsCache.keys.read([key1, key2], methods.fetchHandler).then(() => {
                 assert.ok(gsCache.cacheManager.mset.called);
                 const { args } = gsCache.cacheManager.mset.getCall(0);
                 expect(args[2].ttl).equal(600);
@@ -181,7 +194,7 @@ describe('gstoreCache.keys', () => {
             sinon.spy(gsCache.cacheManager, 'mset');
             sinon.stub(methods, 'fetchHandler').resolves([entity1]);
 
-            return gsCache.keys.wrap(key1, { ttl: 6543 }, methods.fetchHandler).then(() => {
+            return gsCache.keys.read(key1, { ttl: 6543 }, methods.fetchHandler).then(() => {
                 assert.ok(gsCache.cacheManager.mset.called);
                 const { args } = gsCache.cacheManager.mset.getCall(0);
                 expect(args[2].ttl).equal(6543);
@@ -221,7 +234,7 @@ describe('gstoreCache.keys', () => {
                 sinon.spy(stores.redis.store, 'set');
                 sinon.stub(methods, 'fetchHandler').resolves([entity1]);
 
-                return gsCache.keys.wrap(key1, methods.fetchHandler).then(() => {
+                return gsCache.keys.read(key1, methods.fetchHandler).then(() => {
                     const options = gsCache.cacheManager.mset.getCall(0).args[2];
                     const optMemory = stores.memory.store.set.getCall(0).args[2];
                     const optRedis = stores.redis.store.set.getCall(0).args[2];
@@ -230,7 +243,7 @@ describe('gstoreCache.keys', () => {
                     expect(optMemory.ttl).equal(1357);
                     expect(optRedis.ttl).equal(2468);
 
-                    gsCache.keys.wrap(key1, { ttl: { memory: 555, redis: 777 } }, methods.fetchHandler).then(() => {
+                    gsCache.keys.read(key1, { ttl: { memory: 555, redis: 777 } }, methods.fetchHandler).then(() => {
                         const options2 = gsCache.cacheManager.mset.getCall(1).args[2];
                         const optMemory2 = stores.memory.store.set.getCall(1).args[2];
                         const optRedis2 = stores.redis.store.set.getCall(1).args[2];
@@ -255,7 +268,7 @@ describe('gstoreCache.keys', () => {
         it('should prime the cache after fetch', () => {
             sinon.stub(methods, 'fetchHandler').resolves([[entity1, entity2]]);
 
-            return gsCache.keys.wrap([key1, key2], methods.fetchHandler).then(() =>
+            return gsCache.keys.read([key1, key2], methods.fetchHandler).then(() =>
                 cacheManager.mget(keyToString(key1), keyToString(key2)).then(results => {
                     expect(results[0].name).equal('John');
                     expect(results[1].name).equal('Mick');
@@ -269,7 +282,7 @@ describe('gstoreCache.keys', () => {
 
             sinon.stub(methods, 'fetchHandler').resolves([entity3]);
 
-            return gsCache.keys.wrap([key1, key2, key3], methods.fetchHandler).then(results => {
+            return gsCache.keys.read([key1, key2, key3], methods.fetchHandler).then(results => {
                 expect(methods.fetchHandler.called).equal(true);
                 expect(results[0].name).equal('John');
                 expect(results[1].name).equal('Mick');
@@ -288,18 +301,18 @@ describe('gstoreCache.keys', () => {
             cacheManager.set(keyToString(key1), entity1);
             sinon.stub(methods, 'fetchHandler').returns(Promise.reject(error));
 
-            return gsCache.keys.wrap([key1, key2], methods.fetchHandler).then(result => {
+            return gsCache.keys.read([key1, key2], methods.fetchHandler).then(result => {
                 expect(result[0].name).equal('John');
                 expect(result[1]).equal(null);
             });
         });
 
-        it('should buble up the error from the fetch (1)', done => {
+        it('should bubble up the error from the fetch (1)', done => {
             const error = new Error('Houston we got an error');
 
             sinon.stub(methods, 'fetchHandler').rejects(error);
 
-            gsCache.keys.wrap(key1, methods.fetchHandler).catch(err => {
+            gsCache.keys.read(key1, methods.fetchHandler).catch(err => {
                 expect(err.message).equal('Houston we got an error');
                 done();
             });
@@ -310,7 +323,7 @@ describe('gstoreCache.keys', () => {
             cacheManager.set(keyToString(key1), entity1);
             sinon.stub(methods, 'fetchHandler').rejects(error);
 
-            gsCache.keys.wrap([key1, key2], methods.fetchHandler).catch(err => {
+            gsCache.keys.read([key1, key2], methods.fetchHandler).catch(err => {
                 expect(err.message).equal('Error: Houston we got an error');
                 done();
             });
