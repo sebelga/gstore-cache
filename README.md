@@ -15,6 +15,8 @@ https://raw.githubusercontent.com/dbader/readme-template/master/README.md
 gstore cache speeds up your Datastore entities fetching by providing an advanced cache layer  
 for the [@google-cloud/datastore](https://cloud.google.com/nodejs/docs/reference/datastore/1.3.x/) _Key_ and _Query_ API.
 
+## Highlight
+
 * Define **multiple cache stores** with different TTL thanks to [node-cache-manager](https://github.com/BryanDonovan/node-cache-manager).
 * **LRU memory cache** out of the box to speed up your application right away.
 * Datastore <Key> and <Query> objects are converted to **unique string ids** easy to cache.
