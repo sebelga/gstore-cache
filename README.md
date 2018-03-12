@@ -521,7 +521,7 @@ const key2 = datastore.key(['Company', 'Twitter']);
 datastore.get([key1, key2]).then(response => {
     const [entities] = response;
 
-    // warning: the datastore.get() method (passing multiple keys) does not garantee
+    // warning: the datastore.get() method (passing multiple keys) does not guarantee
     // the order of the returned entities. You will need to add some logic to sort
     // the response or use the "read" helper above that does it for you.
 
