@@ -470,7 +470,7 @@ cache.keys.mget(key1, key2).then(entities => {
 });
 ```
 
-#### `set(key, entity, [, options])`
+#### `set(key, entity [, options])`
 
 Add an entity in the cache.
 
@@ -548,7 +548,7 @@ cache.keys.del(key1, key2).then(() => { ... });
 
 ### gstoreCacheInstance.queries
 
-#### `read(query [, fetchHandler])`
+#### `read(query [, options, fetchHandler])`
 
 read is a helper that will: check the cache, if the query is not found in the cache, it will run the query on the Datastore. Finally it will prime the cache with the response of the query.
 
